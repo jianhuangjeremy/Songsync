@@ -56,7 +56,7 @@ export default function AuthScreen() {
             </View>
             <Text style={styles.title}>Songsync</Text>
             <Text style={styles.subtitle}>
-              Identify any song playing around you
+              Identify music playing in your environment
             </Text>
           </View>
 

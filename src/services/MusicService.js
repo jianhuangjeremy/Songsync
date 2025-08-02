@@ -27,6 +27,8 @@ const MOCK_SONGS = [
     genre: 'Pop',
     year: '2013',
     confidence: 0.95,
+    chords: ['F', 'C', 'G', 'Am'],
+    hasMidi: true,
   },
   {
     id: '2',
@@ -37,6 +39,8 @@ const MOCK_SONGS = [
     genre: 'Rock',
     year: '1975',
     confidence: 0.92,
+    chords: ['Bb', 'Eb', 'F', 'Cm'],
+    hasMidi: true,
   },
   {
     id: '3',
@@ -47,6 +51,8 @@ const MOCK_SONGS = [
     genre: 'Pop',
     year: '2017',
     confidence: 0.88,
+    chords: ['C#m', 'F#m', 'A', 'B'],
+    hasMidi: true,
   },
   {
     id: '4',
@@ -57,6 +63,8 @@ const MOCK_SONGS = [
     genre: 'Synthpop',
     year: '2019',
     confidence: 0.94,
+    chords: ['Fm', 'Db', 'Ab', 'Eb'],
+    hasMidi: true,
   },
   {
     id: '5',
@@ -67,6 +75,8 @@ const MOCK_SONGS = [
     genre: 'Pop Rock',
     year: '2020',
     confidence: 0.91,
+    chords: ['Em', 'Am', 'C', 'G'],
+    hasMidi: true,
   },
   {
     id: '6',
@@ -77,6 +87,8 @@ const MOCK_SONGS = [
     genre: 'Disco Pop',
     year: '2020',
     confidence: 0.89,
+    chords: ['D', 'A', 'Bm', 'G'],
+    hasMidi: true,
   },
 ];
 

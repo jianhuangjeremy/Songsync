@@ -297,14 +297,14 @@ export default function HomeScreen({ navigation }) {
                 ? 'Listening...' 
                 : isProcessing 
                 ? 'Identifying song...' 
-                : 'Tap to identify music'}
+                : 'Tap to identify ambient music'}
             </Text>
             <Text style={styles.statusSubtext}>
               {isRecording 
-                ? 'Recording audio from your environment' 
+                ? 'Listening to ambient music in your environment' 
                 : isProcessing 
-                ? 'Analyzing audio patterns' 
-                : 'Hold the button to capture audio'}
+                ? 'Analyzing audio patterns and finding song details' 
+                : 'Tap to capture music playing around you'}
             </Text>
           </View>
 
@@ -351,16 +351,20 @@ export default function HomeScreen({ navigation }) {
             <BlurView intensity={15} style={[styles.instructionsCard, GlassStyles.glassCard]}>
               <Text style={styles.instructionsTitle}>How it works</Text>
               <View style={styles.instructionStep}>
-                <Ionicons name="play" size={20} color={Colors.lightGreen} />
-                <Text style={styles.instructionText}>Play music around you</Text>
+                <Ionicons name="radio-button-on" size={20} color={Colors.lightGreen} />
+                <Text style={styles.instructionText}>Tap to start recording ambient music</Text>
               </View>
               <View style={styles.instructionStep}>
-                <Ionicons name="mic" size={20} color={Colors.purple} />
-                <Text style={styles.instructionText}>Tap and hold the record button</Text>
+                <Ionicons name="search" size={20} color={Colors.purple} />
+                <Text style={styles.instructionText}>Identify music playing in environment</Text>
               </View>
               <View style={styles.instructionStep}>
-                <Ionicons name="musical-notes" size={20} color={Colors.lightGreen} />
-                <Text style={styles.instructionText}>Get instant song identification</Text>
+                <Ionicons name="information-circle" size={20} color={Colors.lightGreen} />
+                <Text style={styles.instructionText}>Get complete song information</Text>
+              </View>
+              <View style={styles.instructionStep}>
+                <Ionicons name="musical-note" size={20} color={Colors.purple} />
+                <Text style={styles.instructionText}>Access chords and MIDI files</Text>
               </View>
             </BlurView>
           </View>

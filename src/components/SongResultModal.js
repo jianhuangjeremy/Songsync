@@ -128,6 +128,16 @@ export default function SongResultModal({
                           <Text style={styles.detailText}>{song.year}</Text>
                         </View>
                       )}
+                      
+                      <View style={styles.detailItem}>
+                        <Ionicons name="musical-note" size={16} color={Colors.lightGreen} />
+                        <Text style={styles.detailText}>Chords Available</Text>
+                      </View>
+                      
+                      <View style={styles.detailItem}>
+                        <Ionicons name="documents-outline" size={16} color={Colors.lightGreen} />
+                        <Text style={styles.detailText}>MIDI Files</Text>
+                      </View>
                     </View>
                   </TouchableOpacity>
                 ))
