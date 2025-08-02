@@ -8,13 +8,19 @@ import {
   Alert,
   Animated,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
+
+// Conditional imports for platform compatibility
+let Audio, FileSystem;
+if (Platform.OS !== 'web') {
+  Audio = require('expo-av').Audio;
+  FileSystem = require('expo-file-system');
+}
 
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../styles/Colors';
@@ -89,16 +95,40 @@ export default function HomeScreen({ navigation }) {
 
   const requestPermissions = async () => {
     try {
-      const { granted } = await Audio.requestPermissionsAsync();
-      if (!granted) {
-        Alert.alert(
-          'Permission Required',
-          'Please grant microphone permission to record audio for song identification.',
-          [{ text: 'OK' }]
-        );
-        return false;
+      if (Platform.OS === 'web') {
+        // For web, we'll use the Web Audio API or MediaRecorder
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          try {
+            await navigator.mediaDevices.getUserMedia({ audio: true });
+            return true;
+          } catch (error) {
+            Alert.alert(
+              'Permission Required',
+              'Please grant microphone permission to record audio for song identification.',
+              [{ text: 'OK' }]
+            );
+            return false;
+          }
+        } else {
+          Alert.alert(
+            'Not Supported',
+            'Audio recording is not supported in this browser. Please try on a mobile device.',
+            [{ text: 'OK' }]
+          );
+          return false;
+        }
+      } else {
+        const { granted } = await Audio.requestPermissionsAsync();
+        if (!granted) {
+          Alert.alert(
+            'Permission Required',
+            'Please grant microphone permission to record audio for song identification.',
+            [{ text: 'OK' }]
+          );
+          return false;
+        }
+        return true;
       }
-      return true;
     } catch (error) {
       console.error('Permission request error:', error);
       return false;
@@ -110,24 +140,41 @@ export default function HomeScreen({ navigation }) {
       const hasPermission = await requestPermissions();
       if (!hasPermission) return;
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
+      if (Platform.OS === 'web') {
+        // For web demo, we'll simulate recording
+        setIsRecording(true);
+        
+        // Animate button press
+        Animated.spring(scaleAnimation, {
+          toValue: 0.9,
+          useNativeDriver: true,
+        }).start();
 
-      const { recording: newRecording } = await Audio.Recording.createAsync(
-        Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY
-      );
+        // Auto-stop after 3 seconds for demo
+        setTimeout(() => {
+          if (isRecording) {
+            stopRecording();
+          }
+        }, 3000);
+      } else {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+        });
 
-      setRecording(newRecording);
-      setIsRecording(true);
+        const { recording: newRecording } = await Audio.Recording.createAsync(
+          Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY
+        );
 
-      // Animate button press
-      Animated.spring(scaleAnimation, {
-        toValue: 0.9,
-        useNativeDriver: true,
-      }).start();
+        setRecording(newRecording);
+        setIsRecording(true);
 
+        // Animate button press
+        Animated.spring(scaleAnimation, {
+          toValue: 0.9,
+          useNativeDriver: true,
+        }).start();
+      }
     } catch (error) {
       console.error('Failed to start recording:', error);
       Alert.alert('Error', 'Failed to start recording. Please try again.');
@@ -136,8 +183,6 @@ export default function HomeScreen({ navigation }) {
 
   const stopRecording = async () => {
     try {
-      if (!recording) return;
-
       setIsRecording(false);
       setIsProcessing(true);
 
@@ -147,12 +192,19 @@ export default function HomeScreen({ navigation }) {
         useNativeDriver: true,
       }).start();
 
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      setRecording(null);
+      if (Platform.OS === 'web') {
+        // For web demo, simulate processing and return mock data
+        await handleSongIdentification('web-demo-audio');
+      } else {
+        if (!recording) return;
+        
+        await recording.stopAndUnloadAsync();
+        const uri = recording.getURI();
+        setRecording(null);
 
-      if (uri) {
-        await handleSongIdentification(uri);
+        if (uri) {
+          await handleSongIdentification(uri);
+        }
       }
     } catch (error) {
       console.error('Failed to stop recording:', error);

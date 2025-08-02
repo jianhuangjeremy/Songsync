@@ -1,9 +1,21 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import * as SecureStore from 'expo-secure-store';
-import * as AuthSession from 'expo-auth-session';
-import * as WebBrowser from 'expo-web-browser';
+import { Platform } from 'react-native';
 
-WebBrowser.maybeCompleteAuthSession();
+// Conditional imports for platform compatibility
+let SecureStore, AuthSession, WebBrowser;
+if (Platform.OS !== 'web') {
+  SecureStore = require('expo-secure-store');
+  AuthSession = require('expo-auth-session');
+  WebBrowser = require('expo-web-browser');
+  WebBrowser.maybeCompleteAuthSession();
+} else {
+  // Web fallback for storage
+  SecureStore = {
+    getItemAsync: async (key) => localStorage.getItem(key),
+    setItemAsync: async (key, value) => localStorage.setItem(key, value),
+    deleteItemAsync: async (key) => localStorage.removeItem(key),
+  };
+}
 
 const AuthContext = createContext({});
 

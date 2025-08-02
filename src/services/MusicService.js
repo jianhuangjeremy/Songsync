@@ -1,5 +1,18 @@
-import * as FileSystem from 'expo-file-system';
-import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
+
+// Conditional imports for platform compatibility
+let FileSystem, SecureStore;
+if (Platform.OS !== 'web') {
+  FileSystem = require('expo-file-system');
+  SecureStore = require('expo-secure-store');
+} else {
+  // Web fallback for storage
+  SecureStore = {
+    getItemAsync: async (key) => localStorage.getItem(key),
+    setItemAsync: async (key, value) => localStorage.setItem(key, value),
+    deleteItemAsync: async (key) => localStorage.removeItem(key),
+  };
+}
 
 const API_BASE_URL = 'http://localhost:8080';
 
@@ -39,11 +52,13 @@ const MOCK_SONGS = [
 
 export const identifySong = async (audioUri) => {
   try {
-    // Read the audio file
-    const audioInfo = await FileSystem.getInfoAsync(audioUri);
-    
-    if (!audioInfo.exists) {
-      throw new Error('Audio file not found');
+    // For web or when FileSystem is not available, skip file check
+    if (Platform.OS !== 'web' && FileSystem) {
+      const audioInfo = await FileSystem.getInfoAsync(audioUri);
+      
+      if (!audioInfo.exists) {
+        throw new Error('Audio file not found');
+      }
     }
 
     // For demo purposes, we'll use a mock API call
