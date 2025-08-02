@@ -84,8 +84,8 @@ export default function SongResultModal({
                     <View style={styles.songCardHeader}>
                       <View style={styles.songInfo}>
                         <Text style={styles.songName}>{song.name}</Text>
-                        <Text style={styles.artistName}>{song.singerName}</Text>
-                        <Text style={styles.albumName}>{song.album}</Text>
+                        <Text style={styles.artistName}>by {song.singerName}</Text>
+                        <Text style={styles.albumName}>from "{song.album}"</Text>
                       </View>
                       <View style={styles.songMeta}>
                         <View style={[
@@ -96,7 +96,7 @@ export default function SongResultModal({
                             styles.confidenceText,
                             { color: getConfidenceColor(song.confidence) }
                           ]}>
-                            {getConfidenceText(song.confidence)}
+                            {getConfidenceText(song.confidence)} Match
                           </Text>
                         </View>
                         <Ionicons 
@@ -106,6 +106,8 @@ export default function SongResultModal({
                         />
                       </View>
                     </View>
+
+                    <View style={styles.divider} />
 
                     <View style={styles.songDetails}>
                       <View style={styles.detailItem}>
@@ -262,6 +264,11 @@ const styles = StyleSheet.create({
   confidenceText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginVertical: 8,
   },
   songDetails: {
     flexDirection: 'row',
