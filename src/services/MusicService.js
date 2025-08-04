@@ -236,3 +236,29 @@ export const updatePlayCount = async (songId, userId) => {
     throw error;
   }
 };
+
+export const initializeDemoLibrary = async (userId) => {
+  try {
+    const libraryKey = `library_${userId}`;
+    const existingLibraryJson = await SecureStore.getItemAsync(libraryKey);
+    const existingLibrary = existingLibraryJson ? JSON.parse(existingLibraryJson) : [];
+
+    // Only initialize if library is empty
+    if (existingLibrary.length === 0) {
+      const demoSongs = MOCK_SONGS.slice(0, 3).map((song, index) => ({
+        ...song,
+        addedAt: new Date(Date.now() - (index * 24 * 60 * 60 * 1000)).toISOString(), // Spread over 3 days
+        playCount: Math.floor(Math.random() * 5) + 1,
+        lastPlayedAt: new Date(Date.now() - (index * 2 * 60 * 60 * 1000)).toISOString(), // Spread over hours
+      }));
+
+      await SecureStore.setItemAsync(libraryKey, JSON.stringify(demoSongs));
+      return demoSongs;
+    }
+
+    return existingLibrary;
+  } catch (error) {
+    console.error('Initialize demo library error:', error);
+    return [];
+  }
+};

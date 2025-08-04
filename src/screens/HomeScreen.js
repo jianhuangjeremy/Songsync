@@ -9,6 +9,8 @@ import {
   Animated,
   ActivityIndicator,
   Platform,
+  Image,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -26,7 +28,7 @@ import { useAuth } from '../context/AuthContext';
 import { Colors } from '../styles/Colors';
 import { GlassStyles } from '../styles/GlassStyles';
 import SongResultModal from '../components/SongResultModal';
-import { identifySong, saveSongToLibrary } from '../services/MusicService';
+import { identifySong, saveSongToLibrary, getLibrary, initializeDemoLibrary } from '../services/MusicService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -37,6 +39,7 @@ export default function HomeScreen({ navigation }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [songResults, setSongResults] = useState([]);
   const [showResults, setShowResults] = useState(false);
+  const [recentResults, setRecentResults] = useState([]);
   
   const scaleAnimation = useRef(new Animated.Value(1)).current;
   const pulseAnimation = useRef(new Animated.Value(1)).current;
@@ -49,6 +52,10 @@ export default function HomeScreen({ navigation }) {
       }
     };
   }, [recording]);
+
+  useEffect(() => {
+    loadRecentResults();
+  }, []);
 
   useEffect(() => {
     if (isRecording) {
@@ -91,6 +98,22 @@ export default function HomeScreen({ navigation }) {
     rotateAnimation.stopAnimation();
     rotateAnimation.setValue(0);
     pulseAnimation.setValue(1);
+  };
+
+  const loadRecentResults = async () => {
+    try {
+      // Initialize demo library if user is new
+      await initializeDemoLibrary(user.id);
+      
+      const library = await getLibrary(user.id);
+      // Get the 3 most recently added songs
+      const recent = library
+        .sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt))
+        .slice(0, 3);
+      setRecentResults(recent);
+    } catch (error) {
+      console.error('Error loading recent results:', error);
+    }
   };
 
   const requestPermissions = async () => {
@@ -231,6 +254,8 @@ export default function HomeScreen({ navigation }) {
       await saveSongToLibrary(song, user.id);
       setShowResults(false);
       setSongResults([]);
+      // Reload recent results to show the newly added song
+      loadRecentResults();
       Alert.alert('Success', `"${song.name}" has been added to your library!`);
     } catch (error) {
       console.error('Save song error:', error);
@@ -316,7 +341,11 @@ export default function HomeScreen({ navigation }) {
         </View>
 
         {/* Main Content */}
-        <View style={styles.mainContent}>
+        <ScrollView 
+          style={styles.mainContent}
+          contentContainerStyle={styles.mainContentContainer}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Status Text */}
           <View style={styles.statusContainer}>
             <Text style={styles.statusText}>
@@ -395,7 +424,66 @@ export default function HomeScreen({ navigation }) {
               </View>
             </BlurView>
           </View>
-        </View>
+
+          {/* Recent Results */}
+          {recentResults.length > 0 && (
+            <View style={styles.recentResultsContainer}>
+              <BlurView intensity={15} style={[styles.recentResultsCard, GlassStyles.glassCard]}>
+                <View style={styles.recentResultsHeader}>
+                  <Text style={styles.recentResultsTitle}>Recent Discoveries</Text>
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('Library')}
+                    style={styles.learnMoreButton}
+                  >
+                    <Text style={styles.learnMoreText}>Learn more</Text>
+                    <Ionicons name="chevron-forward" size={16} color={Colors.lightGreen} />
+                  </TouchableOpacity>
+                </View>
+                
+                {recentResults.map((song, index) => (
+                  <TouchableOpacity
+                    key={song.id}
+                    style={styles.recentSongItem}
+                    onPress={() => navigation.navigate('Library')}
+                  >
+                    <View style={styles.recentSongAlbum}>
+                      {song.albumCover ? (
+                        <Image 
+                          source={{ uri: song.albumCover }} 
+                          style={styles.recentAlbumCover}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={styles.recentDefaultAlbum}>
+                          <Ionicons name="musical-notes" size={16} color={Colors.lightGreen} />
+                        </View>
+                      )}
+                    </View>
+                    
+                    <View style={styles.recentSongInfo}>
+                      <Text style={styles.recentSongName} numberOfLines={1}>
+                        {song.name}
+                      </Text>
+                      <Text style={styles.recentArtistName} numberOfLines={1}>
+                        {song.singerName}
+                      </Text>
+                    </View>
+                    
+                    <TouchableOpacity
+                      style={styles.recentPlayButton}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handlePlaySong(song);
+                      }}
+                    >
+                      <Ionicons name="play" size={14} color={Colors.lightGreen} />
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                ))}
+              </BlurView>
+            </View>
+          )}
+        </ScrollView>
 
         {/* Song Results Modal */}
         <SongResultModal
@@ -457,9 +545,12 @@ const styles = StyleSheet.create({
   },
   mainContent: {
     flex: 1,
+    paddingHorizontal: 20,
+  },
+  mainContentContainer: {
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   statusContainer: {
     alignItems: 'center',
@@ -529,5 +620,83 @@ const styles = StyleSheet.create({
     color: Colors.lightGray,
     marginLeft: 12,
     flex: 1,
+  },
+  recentResultsContainer: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  recentResultsCard: {
+    padding: 16,
+  },
+  recentResultsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  recentResultsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.white,
+  },
+  learnMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  learnMoreText: {
+    fontSize: 14,
+    color: Colors.lightGreen,
+    marginRight: 4,
+    fontWeight: '600',
+  },
+  recentSongItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  recentSongAlbum: {
+    marginRight: 12,
+  },
+  recentAlbumCover: {
+    width: 40,
+    height: 40,
+    borderRadius: 6,
+  },
+  recentDefaultAlbum: {
+    width: 40,
+    height: 40,
+    borderRadius: 6,
+    backgroundColor: Colors.glass,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  recentSongInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  recentSongName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.white,
+    marginBottom: 2,
+  },
+  recentArtistName: {
+    fontSize: 12,
+    color: Colors.lightGray,
+    opacity: 0.8,
+  },
+  recentPlayButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
