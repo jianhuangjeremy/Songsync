@@ -39,6 +39,7 @@ export default function HomeScreen({ navigation }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [songResults, setSongResults] = useState([]);
   const [showResults, setShowResults] = useState(false);
+  const [recentResults, setRecentResults] = useState([]);
   const [showScrollIndicator, setShowScrollIndicator] = useState(true);
   const scrollIndicatorAnimation = useRef(new Animated.Value(0)).current;
   
