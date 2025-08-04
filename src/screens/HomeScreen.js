@@ -39,7 +39,8 @@ export default function HomeScreen({ navigation }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [songResults, setSongResults] = useState([]);
   const [showResults, setShowResults] = useState(false);
-  const [recentResults, setRecentResults] = useState([]);
+  const [showScrollIndicator, setShowScrollIndicator] = useState(true);
+  const scrollIndicatorAnimation = useRef(new Animated.Value(0)).current;
   
   const scaleAnimation = useRef(new Animated.Value(1)).current;
   const pulseAnimation = useRef(new Animated.Value(1)).current;
@@ -55,7 +56,25 @@ export default function HomeScreen({ navigation }) {
 
   useEffect(() => {
     loadRecentResults();
+    startScrollIndicatorAnimation();
   }, []);
+
+  const startScrollIndicatorAnimation = () => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(scrollIndicatorAnimation, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scrollIndicatorAnimation, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  };
 
   useEffect(() => {
     if (isRecording) {
@@ -295,6 +314,14 @@ export default function HomeScreen({ navigation }) {
     );
   };
 
+  const handleScroll = (event) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    // Hide scroll indicator after user starts scrolling
+    if (offsetY > 50 && showScrollIndicator) {
+      setShowScrollIndicator(false);
+    }
+  };
+
   const handleRecordPress = () => {
     if (isRecording) {
       stopRecording();
@@ -344,7 +371,11 @@ export default function HomeScreen({ navigation }) {
         <ScrollView 
           style={styles.mainContent}
           contentContainerStyle={styles.mainContentContainer}
-          showsVerticalScrollIndicator={false}
+          showsVerticalScrollIndicator={true}
+          bounces={true}
+          alwaysBounceVertical={true}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
         >
           {/* Status Text */}
           <View style={styles.statusContainer}>
@@ -362,6 +393,11 @@ export default function HomeScreen({ navigation }) {
                 ? 'Analyzing audio patterns and finding song details' 
                 : 'Tap to capture music playing around you'}
             </Text>
+            {!isRecording && !isProcessing && recentResults.length > 0 && (
+              <Text style={styles.scrollHintSubtext}>
+                ↓ Scroll down to see your recent discoveries
+              </Text>
+            )}
           </View>
 
           {/* Record Button */}
@@ -483,7 +519,38 @@ export default function HomeScreen({ navigation }) {
               </BlurView>
             </View>
           )}
+
+          {/* Scroll Hint */}
+          <View style={styles.scrollHint}>
+            <Ionicons name="chevron-up" size={20} color={Colors.lightGray} style={styles.scrollIcon} />
+            <Text style={styles.scrollHintText}>Scroll to explore</Text>
+          </View>
         </ScrollView>
+
+        {/* Floating Scroll Indicator */}
+        {recentResults.length > 0 && showScrollIndicator && (
+          <Animated.View 
+            style={[
+              styles.floatingScrollIndicator,
+              {
+                opacity: scrollIndicatorAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.3, 1],
+                }),
+                transform: [{
+                  translateY: scrollIndicatorAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 10],
+                  }),
+                }],
+              },
+            ]}
+          >
+            <BlurView intensity={10} style={styles.scrollIndicatorBlur}>
+              <Ionicons name="chevron-down" size={16} color={Colors.lightGreen} />
+            </BlurView>
+          </Animated.View>
+        )}
 
         {/* Song Results Modal */}
         <SongResultModal
@@ -548,13 +615,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   mainContentContainer: {
-    justifyContent: 'space-around',
+    flexGrow: 1,
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingBottom: 20,
+    paddingBottom: 40,
+    minHeight: height - 200, // Ensure minimum height to enable scrolling
   },
   statusContainer: {
     alignItems: 'center',
-    marginTop: 40,
+    marginTop: 20,
+    marginBottom: 20,
   },
   statusText: {
     fontSize: 24,
@@ -569,9 +639,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.8,
   },
+  scrollHintSubtext: {
+    fontSize: 14,
+    color: Colors.lightGreen,
+    textAlign: 'center',
+    opacity: 0.7,
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
   recordContainer: {
     justifyContent: 'center',
     alignItems: 'center',
+    marginVertical: 30,
   },
   recordButtonOuter: {
     width: 220,
@@ -598,7 +677,7 @@ const styles = StyleSheet.create({
   },
   instructionsContainer: {
     width: '100%',
-    marginBottom: 40,
+    marginBottom: 20,
   },
   instructionsCard: {
     padding: 20,
@@ -698,5 +777,40 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(16, 185, 129, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  scrollHint: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    opacity: 0.6,
+  },
+  scrollHintText: {
+    fontSize: 12,
+    color: Colors.lightGray,
+    marginTop: 4,
+    opacity: 0.8,
+  },
+  scrollIcon: {
+    opacity: 0.6,
+  },
+  floatingScrollIndicator: {
+    position: 'absolute',
+    bottom: Platform.OS === 'web' ? 100 : 120,
+    right: 20,
+    zIndex: 10,
+  },
+  scrollIndicatorBlur: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+    shadowColor: Colors.lightGreen,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 5,
   },
 });
