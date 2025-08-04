@@ -29,6 +29,7 @@ const MOCK_SONGS = [
     confidence: 0.95,
     chords: ['F', 'C', 'G', 'Am'],
     hasMidi: true,
+    albumCover: 'https://upload.wikimedia.org/wikipedia/en/6/6f/Pharrell_Williams_-_G_I_R_L.png',
   },
   {
     id: '2',
@@ -41,6 +42,7 @@ const MOCK_SONGS = [
     confidence: 0.92,
     chords: ['Bb', 'Eb', 'F', 'Cm'],
     hasMidi: true,
+    albumCover: 'https://upload.wikimedia.org/wikipedia/en/4/4d/Queen_A_Night_At_The_Opera.png',
   },
   {
     id: '3',
@@ -53,6 +55,7 @@ const MOCK_SONGS = [
     confidence: 0.88,
     chords: ['C#m', 'F#m', 'A', 'B'],
     hasMidi: true,
+    albumCover: 'https://upload.wikimedia.org/wikipedia/en/4/45/Divide_cover.png',
   },
   {
     id: '4',
@@ -65,6 +68,7 @@ const MOCK_SONGS = [
     confidence: 0.94,
     chords: ['Fm', 'Db', 'Ab', 'Eb'],
     hasMidi: true,
+    albumCover: 'https://upload.wikimedia.org/wikipedia/en/c/c1/The_Weeknd_-_After_Hours.png',
   },
   {
     id: '5',
@@ -77,6 +81,7 @@ const MOCK_SONGS = [
     confidence: 0.91,
     chords: ['Em', 'Am', 'C', 'G'],
     hasMidi: true,
+    albumCover: 'https://upload.wikimedia.org/wikipedia/en/f/f3/Harry_Styles_-_Fine_Line.png',
   },
   {
     id: '6',
@@ -89,6 +94,7 @@ const MOCK_SONGS = [
     confidence: 0.89,
     chords: ['D', 'A', 'Bm', 'G'],
     hasMidi: true,
+    albumCover: 'https://upload.wikimedia.org/wikipedia/en/f/f5/Dua_Lipa_-_Future_Nostalgia_%28Official_Album_Cover%29.png',
   },
 ];
 

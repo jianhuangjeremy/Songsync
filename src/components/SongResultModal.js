@@ -7,6 +7,7 @@ import {
   Modal,
   ScrollView,
   Dimensions,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -82,11 +83,29 @@ export default function SongResultModal({
                     activeOpacity={0.8}
                   >
                     <View style={styles.songCardHeader}>
+                      {/* Album Cover */}
+                      <View style={styles.albumCoverContainer}>
+                        {song.albumCover ? (
+                          <Image 
+                            source={{ uri: song.albumCover }} 
+                            style={styles.albumCover}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <View style={styles.defaultAlbumCover}>
+                            <Ionicons name="musical-notes" size={24} color={Colors.lightGreen} />
+                          </View>
+                        )}
+                      </View>
+                      
+                      {/* Song Info */}
                       <View style={styles.songInfo}>
                         <Text style={styles.songName}>{song.name}</Text>
                         <Text style={styles.artistName}>by {song.singerName}</Text>
                         <Text style={styles.albumName}>from "{song.album}"</Text>
                       </View>
+                      
+                      {/* Meta Info */}
                       <View style={styles.songMeta}>
                         <View style={[
                           styles.confidenceBadge,
@@ -238,9 +257,27 @@ const styles = StyleSheet.create({
   },
   songCardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 12,
+  },
+  albumCoverContainer: {
+    marginRight: 12,
+  },
+  albumCover: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: Colors.glass,
+  },
+  defaultAlbumCover: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: Colors.glass,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   songInfo: {
     flex: 1,
