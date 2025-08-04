@@ -23,7 +23,8 @@ export default function SongResultModal({
   results, 
   onSelectSong, 
   onRetry, 
-  onClose 
+  onClose,
+  onPlaySong 
 }) {
   const formatDuration = (duration) => {
     return duration || 'Unknown';
@@ -39,6 +40,12 @@ export default function SongResultModal({
     if (confidence > 0.9) return 'High';
     if (confidence > 0.7) return 'Medium';
     return 'Low';
+  };
+
+  const handlePlaySong = (song) => {
+    if (onPlaySong) {
+      onPlaySong(song);
+    }
   };
 
   return (
@@ -86,14 +93,40 @@ export default function SongResultModal({
                       {/* Album Cover */}
                       <View style={styles.albumCoverContainer}>
                         {song.albumCover ? (
-                          <Image 
-                            source={{ uri: song.albumCover }} 
-                            style={styles.albumCover}
-                            resizeMode="cover"
-                          />
+                          <View style={styles.albumCoverWrapper}>
+                            <Image 
+                              source={{ uri: song.albumCover }} 
+                              style={styles.albumCover}
+                              resizeMode="cover"
+                            />
+                            <TouchableOpacity 
+                              style={styles.playButtonOverlay}
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                handlePlaySong(song);
+                              }}
+                              activeOpacity={0.8}
+                            >
+                              <View style={styles.playButton}>
+                                <Ionicons name="play" size={16} color={Colors.white} />
+                              </View>
+                            </TouchableOpacity>
+                          </View>
                         ) : (
                           <View style={styles.defaultAlbumCover}>
-                            <Ionicons name="musical-notes" size={24} color={Colors.lightGreen} />
+                            <TouchableOpacity 
+                              style={styles.playButtonOverlay}
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                handlePlaySong(song);
+                              }}
+                              activeOpacity={0.8}
+                            >
+                              <View style={styles.playButton}>
+                                <Ionicons name="play" size={16} color={Colors.white} />
+                              </View>
+                            </TouchableOpacity>
+                            <Ionicons name="musical-notes" size={20} color={Colors.lightGreen} />
                           </View>
                         )}
                       </View>
@@ -262,12 +295,40 @@ const styles = StyleSheet.create({
   },
   albumCoverContainer: {
     marginRight: 12,
+    position: 'relative',
+  },
+  albumCoverWrapper: {
+    position: 'relative',
   },
   albumCover: {
     width: 60,
     height: 60,
     borderRadius: 8,
     backgroundColor: Colors.glass,
+  },
+  playButtonOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 8,
+  },
+  playButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(16, 185, 129, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: Colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
   defaultAlbumCover: {
     width: 60,
@@ -278,6 +339,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.3)',
+    position: 'relative',
   },
   songInfo: {
     flex: 1,

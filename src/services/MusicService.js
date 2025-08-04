@@ -30,6 +30,7 @@ const MOCK_SONGS = [
     chords: ['F', 'C', 'G', 'Am'],
     hasMidi: true,
     albumCover: 'https://upload.wikimedia.org/wikipedia/en/6/6f/Pharrell_Williams_-_G_I_R_L.png',
+    previewUrl: 'https://www.soundjay.com/misc/sounds/bells-2.mp3', // Demo preview
   },
   {
     id: '2',
@@ -43,6 +44,7 @@ const MOCK_SONGS = [
     chords: ['Bb', 'Eb', 'F', 'Cm'],
     hasMidi: true,
     albumCover: 'https://upload.wikimedia.org/wikipedia/en/4/4d/Queen_A_Night_At_The_Opera.png',
+    previewUrl: 'https://www.soundjay.com/misc/sounds/bells-1.mp3', // Demo preview
   },
   {
     id: '3',
@@ -56,6 +58,7 @@ const MOCK_SONGS = [
     chords: ['C#m', 'F#m', 'A', 'B'],
     hasMidi: true,
     albumCover: 'https://upload.wikimedia.org/wikipedia/en/4/45/Divide_cover.png',
+    previewUrl: 'https://www.soundjay.com/misc/sounds/bells-3.mp3', // Demo preview
   },
   {
     id: '4',
@@ -69,6 +72,7 @@ const MOCK_SONGS = [
     chords: ['Fm', 'Db', 'Ab', 'Eb'],
     hasMidi: true,
     albumCover: 'https://upload.wikimedia.org/wikipedia/en/c/c1/The_Weeknd_-_After_Hours.png',
+    previewUrl: 'https://www.soundjay.com/misc/sounds/bells-4.mp3', // Demo preview
   },
   {
     id: '5',
@@ -82,6 +86,7 @@ const MOCK_SONGS = [
     chords: ['Em', 'Am', 'C', 'G'],
     hasMidi: true,
     albumCover: 'https://upload.wikimedia.org/wikipedia/en/f/f3/Harry_Styles_-_Fine_Line.png',
+    previewUrl: 'https://www.soundjay.com/misc/sounds/bells-5.mp3', // Demo preview
   },
   {
     id: '6',
@@ -95,6 +100,7 @@ const MOCK_SONGS = [
     chords: ['D', 'A', 'Bm', 'G'],
     hasMidi: true,
     albumCover: 'https://upload.wikimedia.org/wikipedia/en/f/f5/Dua_Lipa_-_Future_Nostalgia_%28Official_Album_Cover%29.png',
+    previewUrl: 'https://www.soundjay.com/misc/sounds/bells-6.mp3', // Demo preview
   },
 ];
 

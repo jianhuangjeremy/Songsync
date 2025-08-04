@@ -243,6 +243,33 @@ export default function HomeScreen({ navigation }) {
     setSongResults([]);
   };
 
+  const handlePlaySong = (song) => {
+    Alert.alert(
+      'Play Song',
+      `Would you like to play "${song.name}" by ${song.singerName}?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Play on Spotify',
+          onPress: () => {
+            // In a real app, this would open Spotify with the song
+            Alert.alert('Opening Spotify...', `Searching for "${song.name}" by ${song.singerName}`);
+          },
+        },
+        {
+          text: 'Play on Apple Music',
+          onPress: () => {
+            // In a real app, this would open Apple Music with the song
+            Alert.alert('Opening Apple Music...', `Searching for "${song.name}" by ${song.singerName}`);
+          },
+        },
+      ]
+    );
+  };
+
   const handleRecordPress = () => {
     if (isRecording) {
       stopRecording();
@@ -377,6 +404,7 @@ export default function HomeScreen({ navigation }) {
           onSelectSong={handleSongSelect}
           onRetry={handleRetryRecording}
           onClose={() => setShowResults(false)}
+          onPlaySong={handlePlaySong}
         />
       </SafeAreaView>
     </LinearGradient>
