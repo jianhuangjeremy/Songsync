@@ -1,3 +1,4 @@
+// Fixed overflow issues - Cleaned up header with simple button styles to remove duplicate elements
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -7,6 +8,7 @@ import {
   FlatList,
   Alert,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -109,6 +111,26 @@ export default function LibraryScreen({ navigation }) {
         onPress={() => handleSongPlay(song)}
         activeOpacity={0.8}
       >
+        {/* Album Cover with Play Button */}
+        <TouchableOpacity
+          style={styles.albumCoverContainer}
+          onPress={() => handleSongPlay(song)}
+          activeOpacity={0.8}
+        >
+          <Image
+            source={{ uri: song.albumCover || 'https://via.placeholder.com/60x60/8B5CF6/FFFFFF?text=♪' }}
+            style={styles.albumCover}
+            defaultSource={{ uri: 'https://via.placeholder.com/60x60/8B5CF6/FFFFFF?text=♪' }}
+          />
+          <View style={styles.albumCoverOverlay}>
+            <View style={styles.playButtonOverlay}>
+              <View style={styles.playIconContainer}>
+                <Ionicons name="play" size={18} color={Colors.white} />
+              </View>
+            </View>
+          </View>
+        </TouchableOpacity>
+
         {/* Song Info */}
         <View style={styles.songInfo}>
           <Text style={styles.songName}>{song.name}</Text>
@@ -129,21 +151,13 @@ export default function LibraryScreen({ navigation }) {
         </View>
 
         {/* Song Actions */}
-        <View style={styles.songActions}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.playButton]}
-            onPress={() => handleSongPlay(song)}
-          >
-            <Ionicons name="play" size={20} color={Colors.lightGreen} />
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.actionButton, styles.removeButton]}
-            onPress={() => handleRemoveSong(song)}
-          >
-            <Ionicons name="trash-outline" size={18} color={Colors.purple} />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => handleRemoveSong(song)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="trash-outline" size={20} color={Colors.purple} />
+        </TouchableOpacity>
       </TouchableOpacity>
     </BlurView>
   );
@@ -176,7 +190,7 @@ export default function LibraryScreen({ navigation }) {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
-            style={[styles.backButton, GlassStyles.glassButton]}
+            style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
             <Ionicons name="arrow-back" size={24} color={Colors.lightGreen} />
@@ -185,7 +199,7 @@ export default function LibraryScreen({ navigation }) {
           <Text style={styles.headerTitle}>My Library</Text>
           
           <TouchableOpacity
-            style={[styles.headerButton, GlassStyles.glassButton]}
+            style={styles.headerButton}
             onPress={handleRefresh}
           >
             <Ionicons name="refresh" size={24} color={Colors.purple} />
@@ -247,14 +261,17 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+    paddingHorizontal: 0,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 15,
     paddingBottom: 20,
+    minHeight: 65,
+    maxWidth: '100%',
   },
   backButton: {
     width: 44,
@@ -262,11 +279,16 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: Colors.white,
+    textAlign: 'center',
+    flex: 1,
+    marginHorizontal: 12,
+    numberOfLines: 1,
   },
   headerButton: {
     width: 44,
@@ -274,53 +296,112 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   statsCard: {
-    marginHorizontal: 20,
+    marginHorizontal: 16,
     marginBottom: 20,
     padding: 20,
+    minHeight: 80,
+    borderRadius: 16,
   },
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
+    alignItems: 'center',
+    flex: 1,
   },
   statItem: {
     alignItems: 'center',
+    flex: 1,
+    paddingHorizontal: 4,
+    minWidth: 0,
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: Colors.lightGreen,
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: Colors.lightGray,
     opacity: 0.8,
+    textAlign: 'center',
   },
   list: {
     flex: 1,
   },
   listContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingBottom: 20,
   },
   emptyListContainer: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
   songCard: {
-    marginBottom: 12,
+    marginBottom: 16,
     overflow: 'hidden',
+    borderRadius: 16,
   },
   songContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
+  },
+  albumCoverContainer: {
+    position: 'relative',
+    marginRight: 16,
+  },
+  albumCover: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    backgroundColor: Colors.darkPurple,
+    shadowColor: Colors.black,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  albumCoverOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  playButtonOverlay: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(16, 185, 129, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: Colors.black,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  playIconContainer: {
+    marginLeft: 2,
+    marginTop: 1,
   },
   songInfo: {
     flex: 1,
-    marginRight: 16,
+    marginRight: 20,
   },
   songName: {
     fontSize: 16,
@@ -353,25 +434,11 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     opacity: 0.8,
   },
-  songActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  deleteButton: {
+    padding: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-  },
-  playButton: {
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-  },
-  removeButton: {
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
-    borderColor: 'rgba(139, 92, 246, 0.3)',
+    opacity: 0.7,
   },
   emptyContainer: {
     flex: 1,

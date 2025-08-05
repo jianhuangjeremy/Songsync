@@ -1,3 +1,4 @@
+// Fixed audio recording cleanup
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -17,6 +18,12 @@ import { BlurView } from 'expo-blur';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useAuth } from '../context/AuthContext';
+import { identifySong, saveSongToLibrary, getLibrary, initializeDemoLibrary } from '../services/MusicService';
+import SongResultModal from '../components/SongResultModal';
+import { Colors } from '../styles/Colors';
+import { GlassStyles } from '../styles/GlassStyles';
+
 // Conditional imports for platform compatibility
 let Audio, FileSystem;
 if (Platform.OS !== 'web') {
@@ -24,11 +31,49 @@ if (Platform.OS !== 'web') {
   FileSystem = require('expo-file-system');
 }
 
-import { useAuth } from '../context/AuthContext';
-import { Colors } from '../styles/Colors';
-import { GlassStyles } from '../styles/GlassStyles';
-import SongResultModal from '../components/SongResultModal';
-import { identifySong, saveSongToLibrary, getLibrary, initializeDemoLibrary } from '../services/MusicService';
+// Add custom CSS for better scroll bar on web
+if (Platform.OS === 'web') {
+  const style = document.createElement('style');
+  style.textContent = `
+    /* Custom scrollbar for webkit browsers */
+    *::-webkit-scrollbar {
+      width: 12px !important;
+      background: rgba(0, 0, 0, 0.3) !important;
+    }
+    
+    *::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.3) !important;
+      border-radius: 6px !important;
+      border: 1px solid rgba(16, 185, 129, 0.3) !important;
+    }
+    
+    *::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, #10B981 0%, #059669 100%) !important;
+      border-radius: 6px !important;
+      border: 1px solid rgba(16, 185, 129, 0.5) !important;
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.3) !important;
+      transition: all 0.3s ease !important;
+    }
+    
+    *::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(180deg, #059669 0%, #047857 100%) !important;
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.5) !important;
+      transform: scale(1.1) !important;
+    }
+    
+    /* Firefox scrollbar */
+    * {
+      scrollbar-width: thick !important;
+      scrollbar-color: #10B981 rgba(0, 0, 0, 0.3) !important;
+    }
+    
+    /* Force scroll bar to always be visible */
+    html, body, #root, #root > div {
+      overflow-y: scroll !important;
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 const { width, height } = Dimensions.get('window');
 
@@ -40,8 +85,10 @@ export default function HomeScreen({ navigation }) {
   const [songResults, setSongResults] = useState([]);
   const [showResults, setShowResults] = useState(false);
   const [recentResults, setRecentResults] = useState([]);
-  const [showScrollIndicator, setShowScrollIndicator] = useState(true);
-  const scrollIndicatorAnimation = useRef(new Animated.Value(0)).current;
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(0);
+  const scrollViewRef = useRef(null);
   
   const scaleAnimation = useRef(new Animated.Value(1)).current;
   const pulseAnimation = useRef(new Animated.Value(1)).current;
@@ -50,32 +97,31 @@ export default function HomeScreen({ navigation }) {
   useEffect(() => {
     return () => {
       if (recording) {
-        recording.stopAndUnloadAsync();
+        recording.getStatusAsync().then((status) => {
+          if (status.isRecording || status.isDoneRecording) {
+            recording.stopAndUnloadAsync().catch((error) => {
+              // Silently handle cleanup errors
+            });
+          }
+        }).catch(() => {
+          // Recording already unloaded, no action needed
+        });
       }
     };
   }, [recording]);
 
   useEffect(() => {
-    loadRecentResults();
-    startScrollIndicatorAnimation();
+    // Wrap async calls in an IIFE to handle errors properly
+    const initializeComponent = async () => {
+      try {
+        await loadRecentResults();
+      } catch (error) {
+        console.error('Error initializing component:', error);
+      }
+    };
+    
+    initializeComponent();
   }, []);
-
-  const startScrollIndicatorAnimation = () => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(scrollIndicatorAnimation, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scrollIndicatorAnimation, {
-          toValue: 0,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  };
 
   useEffect(() => {
     if (isRecording) {
@@ -241,12 +287,16 @@ export default function HomeScreen({ navigation }) {
       } else {
         if (!recording) return;
         
-        await recording.stopAndUnloadAsync();
-        const uri = recording.getURI();
-        setRecording(null);
+        // Check recording status before stopping
+        const status = await recording.getStatusAsync();
+        if (status.isRecording || status.isDoneRecording) {
+          await recording.stopAndUnloadAsync();
+          const uri = recording.getURI();
+          setRecording(null);
 
-        if (uri) {
-          await handleSongIdentification(uri);
+          if (uri) {
+            await handleSongIdentification(uri);
+          }
         }
       }
     } catch (error) {
@@ -275,7 +325,7 @@ export default function HomeScreen({ navigation }) {
       setShowResults(false);
       setSongResults([]);
       // Reload recent results to show the newly added song
-      loadRecentResults();
+      await loadRecentResults();
       Alert.alert('Success', `"${song.name}" has been added to your library!`);
     } catch (error) {
       console.error('Save song error:', error);
@@ -317,10 +367,14 @@ export default function HomeScreen({ navigation }) {
 
   const handleScroll = (event) => {
     const offsetY = event.nativeEvent.contentOffset.y;
-    // Hide scroll indicator after user starts scrolling
-    if (offsetY > 50 && showScrollIndicator) {
-      setShowScrollIndicator(false);
-    }
+    const contentSizeHeight = event.nativeEvent.contentSize.height;
+    const layoutMeasurementHeight = event.nativeEvent.layoutMeasurement.height;
+    
+    // Calculate scroll progress (0 to 1)
+    const progress = offsetY / (contentSizeHeight - layoutMeasurementHeight);
+    setScrollProgress(Math.max(0, Math.min(1, progress)));
+    setContentHeight(contentSizeHeight);
+    setContainerHeight(layoutMeasurementHeight);
   };
 
   const handleRecordPress = () => {
@@ -353,14 +407,14 @@ export default function HomeScreen({ navigation }) {
           
           <View style={styles.headerButtons}>
             <TouchableOpacity
-              style={[styles.headerButton, GlassStyles.glassButton]}
+              style={[GlassStyles.glassButton, styles.headerButton]}
               onPress={() => navigation.navigate('Library')}
             >
               <Ionicons name="library" size={24} color={Colors.lightGreen} />
             </TouchableOpacity>
             
             <TouchableOpacity
-              style={[styles.headerButton, GlassStyles.glassButton]}
+              style={[GlassStyles.glassButton, styles.headerButton]}
               onPress={signOut}
             >
               <Ionicons name="log-out" size={24} color={Colors.purple} />
@@ -370,13 +424,16 @@ export default function HomeScreen({ navigation }) {
 
         {/* Main Content */}
         <ScrollView 
+          ref={scrollViewRef}
           style={styles.mainContent}
           contentContainerStyle={styles.mainContentContainer}
           showsVerticalScrollIndicator={true}
+          indicatorStyle="white" // Make scroll indicator white for better visibility
           bounces={true}
           alwaysBounceVertical={true}
           onScroll={handleScroll}
           scrollEventThrottle={16}
+          persistentScrollbar={true} // Keep scroll bar visible on web
         >
           {/* Status Text */}
           <View style={styles.statusContainer}>
@@ -468,13 +525,6 @@ export default function HomeScreen({ navigation }) {
               <BlurView intensity={15} style={[styles.recentResultsCard, GlassStyles.glassCard]}>
                 <View style={styles.recentResultsHeader}>
                   <Text style={styles.recentResultsTitle}>Recent Discoveries</Text>
-                  <TouchableOpacity
-                    onPress={() => navigation.navigate('Library')}
-                    style={styles.learnMoreButton}
-                  >
-                    <Text style={styles.learnMoreText}>Learn more</Text>
-                    <Ionicons name="chevron-forward" size={16} color={Colors.lightGreen} />
-                  </TouchableOpacity>
                 </View>
                 
                 {recentResults.map((song, index) => (
@@ -517,40 +567,34 @@ export default function HomeScreen({ navigation }) {
                     </TouchableOpacity>
                   </TouchableOpacity>
                 ))}
+                
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('Library')}
+                  style={styles.learnMoreButtonBottom}
+                >
+                  <Text style={styles.learnMoreTextBottom}>Learn more</Text>
+                  <Ionicons name="chevron-forward" size={16} color={Colors.lightGreen} />
+                </TouchableOpacity>
               </BlurView>
             </View>
           )}
-
-          {/* Scroll Hint */}
-          <View style={styles.scrollHint}>
-            <Ionicons name="chevron-up" size={20} color={Colors.lightGray} style={styles.scrollIcon} />
-            <Text style={styles.scrollHintText}>Scroll to explore</Text>
-          </View>
         </ScrollView>
 
-        {/* Floating Scroll Indicator */}
-        {recentResults.length > 0 && showScrollIndicator && (
-          <Animated.View 
-            style={[
-              styles.floatingScrollIndicator,
-              {
-                opacity: scrollIndicatorAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.3, 1],
-                }),
-                transform: [{
-                  translateY: scrollIndicatorAnimation.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, 10],
-                  }),
-                }],
-              },
-            ]}
-          >
-            <BlurView intensity={10} style={styles.scrollIndicatorBlur}>
-              <Ionicons name="chevron-down" size={16} color={Colors.lightGreen} />
-            </BlurView>
-          </Animated.View>
+        {/* Custom Scroll Bar */}
+        {contentHeight > containerHeight && (
+          <View style={styles.customScrollBar}>
+            <View style={styles.scrollTrack}>
+              <View 
+                style={[
+                  styles.scrollThumb,
+                  {
+                    height: `${Math.max(10, (containerHeight / contentHeight) * 100)}%`,
+                    top: `${scrollProgress * (100 - Math.max(10, (containerHeight / contentHeight) * 100))}%`
+                  }
+                ]}
+              />
+            </View>
+          </View>
         )}
 
         {/* Song Results Modal */}
@@ -584,25 +628,30 @@ const styles = StyleSheet.create({
   },
   userInfo: {
     flex: 1,
+    maxWidth: '60%', // Reduce width to make it more compact
   },
   userCard: {
-    padding: 16,
-    marginRight: 16,
+    padding: 12, // Reduce padding for more compact look
+    marginRight: 12, // Reduce margin
+    borderRadius: 12, // Slightly smaller border radius
+    overflow: 'hidden', // Prevent content overflow
   },
   welcomeText: {
-    fontSize: 14,
+    fontSize: 12, // Slightly smaller font
     color: Colors.lightGray,
     opacity: 0.8,
   },
   userName: {
-    fontSize: 18,
+    fontSize: 16, // Reduce font size to fit better
     fontWeight: 'bold',
     color: Colors.white,
-    marginTop: 2,
+    marginTop: 1, // Reduce margin
   },
   headerButtons: {
     flexDirection: 'row',
     gap: 12,
+    alignItems: 'center',
+    zIndex: 10, // Ensure buttons are above other elements
   },
   headerButton: {
     width: 48,
@@ -610,10 +659,20 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-  },
+    backgroundColor: 'rgba(255, 255, 255, 0.1)', // Ensure background visibility
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    paddingVertical: 0, // Override GlassStyles padding
+    paddingHorizontal: 0, // Override GlassStyles padding
+  }, // Fixed navigation icon visibility
   mainContent: {
     flex: 1,
     paddingHorizontal: 20,
+    ...(Platform.OS === 'web' && {
+      // Custom scroll bar styling for web
+      scrollbarWidth: 'thin',
+      scrollbarColor: `${Colors.lightGreen} rgba(255, 255, 255, 0.1)`,
+    }),
   },
   mainContentContainer: {
     flexGrow: 1,
@@ -679,9 +738,13 @@ const styles = StyleSheet.create({
   instructionsContainer: {
     width: '100%',
     marginBottom: 20,
+    paddingHorizontal: 0, // Ensure no extra padding
   },
   instructionsCard: {
     padding: 20,
+    margin: 0, // Override GlassStyles margin to prevent overflow
+    borderRadius: 16, // Maintain consistent border radius
+    overflow: 'hidden', // Prevent content overflow
   },
   instructionsTitle: {
     fontSize: 18,
@@ -704,10 +767,14 @@ const styles = StyleSheet.create({
   recentResultsContainer: {
     width: '100%',
     marginBottom: 20,
+    paddingHorizontal: 0, // Ensure no extra padding
   },
   recentResultsCard: {
     padding: 16,
-  },
+    margin: 0, // Override GlassStyles margin to prevent overflow
+    borderRadius: 16, // Maintain consistent border radius
+    overflow: 'hidden', // Prevent content overflow
+  }, // Fixed overflow issues
   recentResultsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -724,6 +791,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   learnMoreText: {
+    fontSize: 14,
+    color: Colors.lightGreen,
+    marginRight: 4,
+    fontWeight: '600',
+  },
+  learnMoreButtonBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  learnMoreTextBottom: {
     fontSize: 14,
     color: Colors.lightGreen,
     marginRight: 4,
@@ -779,39 +860,37 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  scrollHint: {
-    alignItems: 'center',
-    paddingVertical: 20,
-    opacity: 0.6,
-  },
-  scrollHintText: {
-    fontSize: 12,
-    color: Colors.lightGray,
-    marginTop: 4,
-    opacity: 0.8,
-  },
-  scrollIcon: {
-    opacity: 0.6,
-  },
-  floatingScrollIndicator: {
+  customScrollBar: {
     position: 'absolute',
-    bottom: Platform.OS === 'web' ? 100 : 120,
-    right: 20,
-    zIndex: 10,
-  },
-  scrollIndicatorBlur: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    right: 5,
+    top: 100,
+    bottom: 100,
+    width: 20,
+    zIndex: 100,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+  },
+  scrollTrack: {
+    width: 12,
+    height: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.3)',
+    position: 'relative',
+  },
+  scrollThumb: {
+    position: 'absolute',
+    width: '100%',
+    backgroundColor: Colors.lightGreen,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.5)',
     shadowColor: Colors.lightGreen,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
     elevation: 5,
+    minHeight: 30,
   },
 });

@@ -22,15 +22,25 @@ export default function AuthScreen() {
   const { signInWithGoogle, signInWithApple } = useAuth();
 
   const handleGoogleSignIn = async () => {
-    const result = await signInWithGoogle();
-    if (!result.success) {
+    try {
+      const result = await signInWithGoogle();
+      if (!result.success) {
+        Alert.alert('Error', 'Failed to sign in with Google');
+      }
+    } catch (error) {
+      console.error('Google sign in error:', error);
       Alert.alert('Error', 'Failed to sign in with Google');
     }
   };
 
   const handleAppleSignIn = async () => {
-    const result = await signInWithApple();
-    if (!result.success) {
+    try {
+      const result = await signInWithApple();
+      if (!result.success) {
+        Alert.alert('Error', 'Failed to sign in with Apple');
+      }
+    } catch (error) {
+      console.error('Apple sign in error:', error);
       Alert.alert('Error', 'Failed to sign in with Apple');
     }
   };

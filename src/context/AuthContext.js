@@ -32,7 +32,17 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadStoredAuth();
+    // Wrap async call to handle any potential promise rejection
+    const initializeAuth = async () => {
+      try {
+        await loadStoredAuth();
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+        setLoading(false); // Ensure loading state is updated even on error
+      }
+    };
+    
+    initializeAuth();
   }, []);
 
   const loadStoredAuth = async () => {

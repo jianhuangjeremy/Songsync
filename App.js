@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, StatusBar } from 'react-native';
+import { StyleSheet, View, Text, StatusBar, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,6 +11,38 @@ import AuthScreen from './src/screens/AuthScreen';
 import LibraryScreen from './src/screens/LibraryScreen';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { Colors } from './src/styles/Colors';
+
+// Global unhandled promise rejection handler
+const setupGlobalErrorHandlers = () => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    // Web environment
+    window.addEventListener('unhandledrejection', (event) => {
+      console.warn('Unhandled promise rejection:', event.reason);
+      event.preventDefault(); // Prevent the default behavior (console error)
+    });
+  } else {
+    // React Native environment - Set up promise rejection tracking
+    if (typeof global !== 'undefined') {
+      const originalConsoleError = console.error;
+      console.error = (...args) => {
+        const message = args[0];
+        if (typeof message === 'string' && message.includes('Possible unhandled promise rejection')) {
+          console.warn('Handled promise rejection:', ...args);
+          return;
+        }
+        originalConsoleError(...args);
+      };
+      
+      // Set up unhandled promise rejection handler for React Native
+      global.HermesInternal?.setPromiseRejectionTracker?.((id, rejection) => {
+        console.warn('Unhandled promise rejection (Hermes):', rejection);
+      });
+    }
+  }
+};
+
+// Initialize error handlers
+setupGlobalErrorHandlers();
 
 const Stack = createStackNavigator();
 
@@ -56,7 +88,7 @@ function AppNavigator() {
             <Stack.Screen 
               name="Library" 
               component={LibraryScreen}
-              options={{ title: 'My Library' }}
+              options={{ headerShown: false }}
             />
           </>
         ) : (
