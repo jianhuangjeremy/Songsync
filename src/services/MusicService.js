@@ -136,6 +136,23 @@ export const identifySong = async (audioUri) => {
 
       if (response.ok) {
         const result = await response.json();
+        
+        // Handle different response formats
+        if (!result) {
+          return [];
+        }
+        
+        // If result has a success field and it's false, no songs found
+        if (result.success === false || result.found === false) {
+          return [];
+        }
+        
+        // If result has a songs array, use it
+        if (result.songs) {
+          return Array.isArray(result.songs) ? result.songs : [result.songs];
+        }
+        
+        // If result is directly an array or object
         return Array.isArray(result) ? result : [result];
       } else {
         throw new Error('API call failed');
@@ -143,7 +160,15 @@ export const identifySong = async (audioUri) => {
     } catch (apiError) {
       console.log('API unavailable, using mock data:', apiError.message);
       
-      // Return mock results when API is not available
+      // Simulate different scenarios for demo
+      const randomChance = Math.random();
+      
+      // 20% chance of no results found
+      if (randomChance < 0.2) {
+        return [];
+      }
+      
+      // 80% chance of returning mock results
       const randomResults = MOCK_SONGS
         .sort(() => Math.random() - 0.5)
         .slice(0, Math.floor(Math.random() * 3) + 1);

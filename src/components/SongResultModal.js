@@ -24,7 +24,8 @@ export default function SongResultModal({
   onSelectSong, 
   onRetry, 
   onClose,
-  onPlaySong 
+  onPlaySong,
+  navigation
 }) {
   const formatDuration = (duration) => {
     return duration || 'Unknown';
@@ -191,6 +192,29 @@ export default function SongResultModal({
                         <Text style={styles.detailText}>MIDI Files</Text>
                       </View>
                     </View>
+
+                    {/* Action Button for Music Analysis */}
+                    <TouchableOpacity
+                      style={styles.analysisButton}
+                      onPress={() => {
+                        if (navigation) {
+                          onClose();
+                          navigation.navigate('MusicAnalysis', { song });
+                        }
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <BlurView intensity={10} style={styles.analysisButtonBlur}>
+                        <View style={styles.analysisButtonContent}>
+                          <Ionicons name="analytics-outline" size={20} color={Colors.lightGreen} />
+                          <View style={styles.analysisTextContainer}>
+                            <Text style={styles.analysisButtonTitle}>Music Analysis</Text>
+                            <Text style={styles.analysisButtonSubtitle}>View chords & MIDI</Text>
+                          </View>
+                          <Ionicons name="chevron-forward" size={18} color={Colors.lightGreen} />
+                        </View>
+                      </BlurView>
+                    </TouchableOpacity>
                   </TouchableOpacity>
                 ))
               )}
@@ -420,5 +444,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  analysisButton: {
+    height: 64,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+    marginTop: 16,
+  },
+  analysisButtonBlur: {
+    flex: 1,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    paddingHorizontal: 16,
+  },
+  analysisButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  analysisTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  analysisButtonTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.lightGreen,
+    marginBottom: 2,
+  },
+  analysisButtonSubtitle: {
+    fontSize: 12,
+    color: Colors.lightGray,
+    opacity: 0.8,
   },
 });

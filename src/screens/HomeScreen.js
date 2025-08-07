@@ -21,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { identifySong, saveSongToLibrary, getLibrary, initializeDemoLibrary } from '../services/MusicService';
 import SongResultModal from '../components/SongResultModal';
+import NoSongFoundModal from '../components/NoSongFoundModal';
 import { Colors } from '../styles/Colors';
 import { GlassStyles } from '../styles/GlassStyles';
 
@@ -84,6 +85,7 @@ export default function HomeScreen({ navigation }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [songResults, setSongResults] = useState([]);
   const [showResults, setShowResults] = useState(false);
+  const [showNoSongFoundModal, setShowNoSongFoundModal] = useState(false);
   const [recentResults, setRecentResults] = useState([]);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
@@ -309,8 +311,14 @@ export default function HomeScreen({ navigation }) {
   const handleSongIdentification = async (audioUri) => {
     try {
       const results = await identifySong(audioUri);
-      setSongResults(results);
-      setShowResults(true);
+      
+      if (results && results.length > 0) {
+        setSongResults(results);
+        setShowResults(true);
+      } else {
+        // No songs found - show the "no song found" modal
+        setShowNoSongFoundModal(true);
+      }
     } catch (error) {
       console.error('Song identification error:', error);
       Alert.alert('Error', 'Failed to identify song. Please try again.');
@@ -336,6 +344,18 @@ export default function HomeScreen({ navigation }) {
   const handleRetryRecording = () => {
     setShowResults(false);
     setSongResults([]);
+  };
+
+  const handleNoSongTryAgain = () => {
+    setShowNoSongFoundModal(false);
+    // Start recording again
+    setTimeout(() => {
+      startRecording();
+    }, 500); // Small delay for smooth transition
+  };
+
+  const handleNoSongGotIt = () => {
+    setShowNoSongFoundModal(false);
   };
 
   const handlePlaySong = (song) => {
@@ -605,6 +625,14 @@ export default function HomeScreen({ navigation }) {
           onRetry={handleRetryRecording}
           onClose={() => setShowResults(false)}
           onPlaySong={handlePlaySong}
+          navigation={navigation}
+        />
+
+        {/* No Song Found Modal */}
+        <NoSongFoundModal
+          visible={showNoSongFoundModal}
+          onTryAgain={handleNoSongTryAgain}
+          onGotIt={handleNoSongGotIt}
         />
       </SafeAreaView>
     </LinearGradient>

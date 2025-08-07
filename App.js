@@ -9,6 +9,7 @@ import * as SecureStore from 'expo-secure-store';
 import HomeScreen from './src/screens/HomeScreen';
 import AuthScreen from './src/screens/AuthScreen';
 import LibraryScreen from './src/screens/LibraryScreen';
+import MusicAnalysisScreen from './src/screens/MusicAnalysisScreen';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { Colors } from './src/styles/Colors';
 
@@ -88,6 +89,11 @@ function AppNavigator() {
             <Stack.Screen 
               name="Library" 
               component={LibraryScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="MusicAnalysis" 
+              component={MusicAnalysisScreen}
               options={{ headerShown: false }}
             />
           </>

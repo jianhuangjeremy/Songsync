@@ -133,7 +133,7 @@ export default function LibraryScreen({ navigation }) {
 
         {/* Song Info */}
         <View style={styles.songInfo}>
-          <Text style={styles.songName}>{song.name}</Text>
+          <Text style={styles.songName} numberOfLines={1}>{song.name}</Text>
           <Text style={styles.artistName}>{song.singerName}</Text>
           <Text style={styles.albumName}>{song.album}</Text>
           
@@ -148,6 +148,17 @@ export default function LibraryScreen({ navigation }) {
               <Text style={styles.metaText}>{formatPlayCount(song.playCount)}</Text>
             </View>
           </View>
+
+          {/* Music Analysis Button */}
+          <TouchableOpacity
+            style={styles.analysisButton}
+            onPress={() => navigation.navigate('MusicAnalysis', { song })}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="analytics-outline" size={16} color={Colors.lightGreen} />
+            <Text style={styles.analysisButtonText}>Music Analysis</Text>
+            <Ionicons name="chevron-forward" size={14} color={Colors.lightGreen} />
+          </TouchableOpacity>
         </View>
 
         {/* Song Actions */}
@@ -267,10 +278,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 15,
-    paddingBottom: 20,
-    minHeight: 65,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+    minHeight: 60,
     maxWidth: '100%',
   },
   backButton: {
@@ -300,9 +311,9 @@ const styles = StyleSheet.create({
   },
   statsCard: {
     marginHorizontal: 16,
-    marginBottom: 20,
-    padding: 20,
-    minHeight: 80,
+    marginBottom: 16,
+    padding: 16,
+    minHeight: 75,
     borderRadius: 16,
   },
   statsContainer: {
@@ -334,25 +345,25 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingHorizontal: 16,
-    paddingBottom: 20,
+    paddingBottom: 16,
   },
   emptyListContainer: {
     flex: 1,
     paddingHorizontal: 16,
   },
   songCard: {
-    marginBottom: 16,
+    marginBottom: 12,
     overflow: 'hidden',
     borderRadius: 16,
   },
   songContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
   },
   albumCoverContainer: {
     position: 'relative',
-    marginRight: 16,
+    marginRight: 14,
   },
   albumCover: {
     width: 60,
@@ -401,13 +412,15 @@ const styles = StyleSheet.create({
   },
   songInfo: {
     flex: 1,
-    marginRight: 20,
+    marginRight: 16,
+    minWidth: 0,
   },
   songName: {
     fontSize: 16,
     fontWeight: 'bold',
     color: Colors.white,
     marginBottom: 4,
+    numberOfLines: 1,
   },
   artistName: {
     fontSize: 14,
@@ -477,5 +490,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  analysisButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+    marginTop: 8,
+  },
+  analysisButtonText: {
+    fontSize: 12,
+    color: Colors.lightGreen,
+    marginLeft: 8,
+    fontWeight: '500',
+    flex: 1,
   },
 });
