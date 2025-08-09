@@ -2,7 +2,7 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "Start Songsync App",
+			"label": "Start Songbook App",
 			"type": "shell",
 			"command": "npm start",
 			"group": "build",

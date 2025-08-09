@@ -57,7 +57,7 @@ function AppNavigator() {
           colors={[Colors.black, Colors.purple, Colors.black]}
           style={styles.loadingGradient}
         >
-          <Text style={styles.loadingText}>Songsync</Text>
+          <Text style={styles.loadingText}>Songbook</Text>
         </LinearGradient>
       </View>
     );

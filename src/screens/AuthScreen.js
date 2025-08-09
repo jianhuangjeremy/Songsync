@@ -64,7 +64,7 @@ export default function AuthScreen() {
             <View style={[styles.logoContainer, GlassStyles.glowingBorder]}>
               <Ionicons name="musical-notes" size={60} color={Colors.lightGreen} />
             </View>
-            <Text style={styles.title}>Songsync</Text>
+            <Text style={styles.title}>Songbook</Text>
             <Text style={styles.subtitle}>
               Identify music playing in your environment
             </Text>

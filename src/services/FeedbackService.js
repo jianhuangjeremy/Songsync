@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export class FeedbackService {
   static RATINGS_KEY = 'song_ratings';
@@ -21,20 +21,13 @@ export class FeedbackService {
         ...additionalData
       };
 
-      // Get existing ratings
-      const existingRatings = await this.getAllRatings();
+      // For now, just log the rating data
+      console.log('Rating saved (mock):', ratingData);
       
-      // Update or add the rating for this song
-      existingRatings[songId] = ratingData;
-      
-      // Save back to storage
-      await AsyncStorage.setItem(this.RATINGS_KEY, JSON.stringify(existingRatings));
-      
-      // In a real app, you would also send this to your backend
-      console.log('Rating saved locally:', ratingData);
-      
-      // TODO: Send to backend API
-      // await this.sendRatingToBackend(ratingData);
+      // TODO: Implement AsyncStorage when available
+      // const existingRatings = await this.getAllRatings();
+      // existingRatings[songId] = ratingData;
+      // await AsyncStorage.setItem(this.RATINGS_KEY, JSON.stringify(existingRatings));
       
       return true;
     } catch (error) {
@@ -48,8 +41,10 @@ export class FeedbackService {
    */
   static async getAllRatings() {
     try {
-      const ratingsJson = await AsyncStorage.getItem(this.RATINGS_KEY);
-      return ratingsJson ? JSON.parse(ratingsJson) : {};
+      // TODO: Implement AsyncStorage when available
+      // const ratingsJson = await AsyncStorage.getItem(this.RATINGS_KEY);
+      // return ratingsJson ? JSON.parse(ratingsJson) : {};
+      return {};
     } catch (error) {
       console.error('Failed to get ratings:', error);
       return {};
@@ -62,8 +57,10 @@ export class FeedbackService {
    */
   static async getRating(songId) {
     try {
-      const ratings = await this.getAllRatings();
-      return ratings[songId] || null;
+      // TODO: Implement AsyncStorage when available
+      // const ratings = await this.getAllRatings();
+      // return ratings[songId] || null;
+      return null;
     } catch (error) {
       console.error('Failed to get rating for song:', error);
       return null;
@@ -129,7 +126,8 @@ export class FeedbackService {
    */
   static async clearAllRatings() {
     try {
-      await AsyncStorage.removeItem(this.RATINGS_KEY);
+      // TODO: Implement AsyncStorage when available
+      // await AsyncStorage.removeItem(this.RATINGS_KEY);
       return true;
     } catch (error) {
       console.error('Failed to clear ratings:', error);

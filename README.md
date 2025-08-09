@@ -1,4 +1,4 @@
-# Songsync 🎵
+# Songbook 🎵
 
 A cross-platform music identification app built with React Native and Expo. Identify songs playing around you and build your personal music library.
 
@@ -33,7 +33,7 @@ A cross-platform music identification app built with React Native and Expo. Iden
 1. Clone the repository:
 ```bash
 git clone <your-repo-url>
-cd Songsync-1
+cd Songbook-1
 ```
 
 2. Install dependencies:
