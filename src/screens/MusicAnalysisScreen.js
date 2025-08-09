@@ -16,6 +16,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Colors } from '../styles/Colors';
 import { GlassStyles } from '../styles/GlassStyles';
+import StarRating from '../components/StarRating';
+import { FeedbackService } from '../services/FeedbackService';
 
 const { width } = Dimensions.get('window');
 
@@ -27,6 +29,7 @@ export default function MusicAnalysisScreen({ route, navigation }) {
   const [currentBar, setCurrentBar] = useState(0);
   const [loading, setLoading] = useState(true);
   const [musicData, setMusicData] = useState(null);
+  const [userRating, setUserRating] = useState(0);
   
   const progressAnimation = useRef(new Animated.Value(0)).current;
   const playbackInterval = useRef(null);
@@ -66,6 +69,12 @@ export default function MusicAnalysisScreen({ route, navigation }) {
     try {
       // Simulate API call to get song analysis data
       await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Load existing rating for this song
+      const existingRating = await FeedbackService.getRating(song.id || song.name);
+      if (existingRating) {
+        setUserRating(existingRating.rating);
+      }
       
       // Mock music analysis data with lyrics and chords
       const mockData = {
@@ -245,6 +254,40 @@ export default function MusicAnalysisScreen({ route, navigation }) {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleRatingChange = async (rating, songTitle) => {
+    setUserRating(rating);
+    
+    try {
+      // Save rating using FeedbackService
+      const success = await FeedbackService.saveRating(
+        song.id || song.name, // Use song ID if available, fallback to name
+        rating,
+        songTitle,
+        {
+          artist: song.singerName,
+          album: song.album,
+          analysisType: 'music_analysis'
+        }
+      );
+      
+      if (success) {
+        console.log(`User rated "${songTitle}" with ${rating} stars`);
+        
+        // Show brief success feedback
+        Alert.alert(
+          'Thank you!', 
+          `Your ${rating}-star rating helps us improve the music analysis quality.`,
+          [{ text: 'OK', style: 'default' }]
+        );
+      } else {
+        Alert.alert('Error', 'Failed to save your rating. Please try again.');
+      }
+    } catch (error) {
+      console.error('Failed to save rating:', error);
+      Alert.alert('Error', 'Failed to save your rating. Please try again.');
+    }
   };
 
   const renderProgressBar = () => {
@@ -431,6 +474,16 @@ export default function MusicAnalysisScreen({ route, navigation }) {
           showsVerticalScrollIndicator={false}
         >
           {musicData?.bars.map((bar, index) => renderBar(bar, index))}
+          
+          {/* User Feedback Rating */}
+          <StarRating
+            onRatingChange={handleRatingChange}
+            initialRating={userRating}
+            songTitle={song.name}
+            maxStars={5}
+            showFeedbackText={true}
+          />
+          
           <View style={styles.bottomPadding} />
         </ScrollView>
       </SafeAreaView>
