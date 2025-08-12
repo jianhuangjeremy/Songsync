@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -8,18 +8,18 @@ import {
   Dimensions,
   Alert,
   Animated,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 
-import { Colors } from '../styles/Colors';
-import { GlassStyles } from '../styles/GlassStyles';
-import StarRating from '../components/StarRating';
-import { FeedbackService } from '../services/FeedbackService';
+import { Colors } from "../styles/Colors";
+import { GlassStyles } from "../styles/GlassStyles";
+import StarRating from "../components/StarRating";
+import { FeedbackService } from "../services/FeedbackService";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 export default function MusicAnalysisScreen({ route, navigation }) {
   const { song } = route.params;
@@ -30,14 +30,14 @@ export default function MusicAnalysisScreen({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [musicData, setMusicData] = useState(null);
   const [userRating, setUserRating] = useState(0);
-  
+
   const progressAnimation = useRef(new Animated.Value(0)).current;
   const playbackInterval = useRef(null);
   const scrollViewRef = useRef(null);
 
   useEffect(() => {
     loadMusicData();
-    
+
     // Start waveform animation for active bar
     const animateWaveform = () => {
       Animated.loop(
@@ -55,9 +55,9 @@ export default function MusicAnalysisScreen({ route, navigation }) {
         ])
       ).start();
     };
-    
+
     animateWaveform();
-    
+
     return () => {
       if (playbackInterval.current) {
         clearInterval(playbackInterval.current);
@@ -67,128 +67,77 @@ export default function MusicAnalysisScreen({ route, navigation }) {
 
   const loadMusicData = async () => {
     try {
-      // Simulate API call to get song analysis data
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
       // Load existing rating for this song
-      const existingRating = await FeedbackService.getRating(song.id || song.name);
+      const existingRating = await FeedbackService.getRating(
+        song.id || song.name
+      );
       if (existingRating) {
         setUserRating(existingRating.rating);
       }
-      
-      // Mock music analysis data with lyrics and chords
-      const mockData = {
-        midiFile: {
-          id: '1',
-          name: `${song.name} - Full Track`,
-          size: '45 KB',
-          downloadUrl: 'https://example.com/midi/full-track.mid',
-        },
-        bars: [
-          {
-            id: 0,
-            startTime: 0,
-            endTime: 8,
-            chord: 'C',
-            lyrics: 'It might seem crazy what I\'m about to say',
-            section: 'Verse 1'
+
+      // Use the analysis data that was already fetched during song identification
+      // No need for a separate API call since your backend returns everything together
+      if (song.analysisData) {
+        setMusicData(song.analysisData);
+      } else {
+        // Fallback for songs that don't have analysis data (like library songs)
+        // Generate basic analysis data structure for existing songs
+        const fallbackData = {
+          midiFile: {
+            id: song.id || "1",
+            name: `${song.name} - Full Track`,
+            size: "45 KB",
+            downloadUrl: "https://example.com/midi/fallback.mid",
           },
-          {
-            id: 1,
-            startTime: 8,
-            endTime: 16,
-            chord: 'Am',
-            lyrics: 'Sunshine she\'s here, you can take a break',
-            section: 'Verse 1'
-          },
-          {
-            id: 2,
-            startTime: 16,
-            endTime: 24,
-            chord: 'F',
-            lyrics: 'I\'m a hot air balloon that could go to space',
-            section: 'Verse 1'
-          },
-          {
-            id: 3,
-            startTime: 24,
-            endTime: 32,
-            chord: 'G',
-            lyrics: 'With the air, like I don\'t care baby by the way',
-            section: 'Verse 1'
-          },
-          {
-            id: 4,
-            startTime: 32,
-            endTime: 40,
-            chord: 'C',
-            lyrics: 'Because I\'m happy',
-            section: 'Chorus'
-          },
-          {
-            id: 5,
-            startTime: 40,
-            endTime: 48,
-            chord: 'Am',
-            lyrics: 'Clap along if you feel like a room without a roof',
-            section: 'Chorus'
-          },
-          {
-            id: 6,
-            startTime: 48,
-            endTime: 56,
-            chord: 'F',
-            lyrics: 'Because I\'m happy',
-            section: 'Chorus'
-          },
-          {
-            id: 7,
-            startTime: 56,
-            endTime: 64,
-            chord: 'G',
-            lyrics: 'Clap along if you feel like happiness is the truth',
-            section: 'Chorus'
-          },
-          {
-            id: 8,
-            startTime: 64,
-            endTime: 72,
-            chord: 'Em',
-            lyrics: 'Here come bad news talking this and that',
-            section: 'Verse 2'
-          },
-          {
-            id: 9,
-            startTime: 72,
-            endTime: 80,
-            chord: 'Am',
-            lyrics: 'Give me all you got, don\'t hold back',
-            section: 'Verse 2'
-          },
-          {
-            id: 10,
-            startTime: 80,
-            endTime: 88,
-            chord: 'F',
-            lyrics: 'Well I should probably warn you I\'ll be just fine',
-            section: 'Verse 2'
-          },
-          {
-            id: 11,
-            startTime: 88,
-            endTime: 96,
-            chord: 'G',
-            lyrics: 'No offense to you don\'t waste your time',
-            section: 'Verse 2'
-          },
-        ],
-        sections: ['Intro', 'Verse 1', 'Chorus', 'Verse 2', 'Chorus', 'Bridge', 'Chorus', 'Outro']
-      };
-      
-      setMusicData(mockData);
+          bars: [
+            {
+              id: 0,
+              startTime: 0,
+              endTime: 8,
+              chord: song.chords?.[0] || "C",
+              lyrics: "Sample lyrics for this song...",
+              section: "Verse 1",
+            },
+            {
+              id: 1,
+              startTime: 8,
+              endTime: 16,
+              chord: song.chords?.[1] || "Am",
+              lyrics: "More sample lyrics...",
+              section: "Verse 1",
+            },
+            {
+              id: 2,
+              startTime: 16,
+              endTime: 24,
+              chord: song.chords?.[2] || "F",
+              lyrics: "Chorus section begins...",
+              section: "Chorus",
+            },
+            {
+              id: 3,
+              startTime: 24,
+              endTime: 32,
+              chord: song.chords?.[3] || "G",
+              lyrics: "Main hook of the song...",
+              section: "Chorus",
+            },
+          ],
+          sections: [
+            "Intro",
+            "Verse 1",
+            "Chorus",
+            "Verse 2",
+            "Chorus",
+            "Bridge",
+            "Outro",
+          ],
+        };
+        setMusicData(fallbackData);
+      }
     } catch (error) {
-      console.error('Failed to load music data:', error);
-      Alert.alert('Error', 'Failed to load music analysis data');
+      console.error("Failed to load music data:", error);
+      Alert.alert("Error", "Failed to load music analysis data");
     } finally {
       setLoading(false);
     }
@@ -206,7 +155,7 @@ export default function MusicAnalysisScreen({ route, navigation }) {
       // Play
       setIsPlaying(true);
       playbackInterval.current = setInterval(() => {
-        setCurrentTime(prevTime => {
+        setCurrentTime((prevTime) => {
           const newTime = prevTime + 0.1;
           if (newTime >= duration) {
             setIsPlaying(false);
@@ -216,11 +165,11 @@ export default function MusicAnalysisScreen({ route, navigation }) {
             setCurrentBar(0);
             return 0;
           }
-          
+
           // Update current bar based on time
           if (musicData) {
-            const bar = musicData.bars.find(bar => 
-              newTime >= bar.startTime && newTime < bar.endTime
+            const bar = musicData.bars.find(
+              (bar) => newTime >= bar.startTime && newTime < bar.endTime
             );
             if (bar && bar.id !== currentBar) {
               setCurrentBar(bar.id);
@@ -228,12 +177,12 @@ export default function MusicAnalysisScreen({ route, navigation }) {
               setTimeout(() => {
                 scrollViewRef.current?.scrollTo({
                   y: bar.id * 120, // Approximate height per bar
-                  animated: true
+                  animated: true,
                 });
               }, 100);
             }
           }
-          
+
           return newTime;
         });
       }, 100);
@@ -253,12 +202,12 @@ export default function MusicAnalysisScreen({ route, navigation }) {
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   const handleRatingChange = async (rating, songTitle) => {
     setUserRating(rating);
-    
+
     try {
       // Save rating using FeedbackService
       const success = await FeedbackService.saveRating(
@@ -268,25 +217,25 @@ export default function MusicAnalysisScreen({ route, navigation }) {
         {
           artist: song.singerName,
           album: song.album,
-          analysisType: 'music_analysis'
+          analysisType: "music_analysis",
         }
       );
-      
+
       if (success) {
         console.log(`User rated "${songTitle}" with ${rating} stars`);
-        
+
         // Show brief success feedback
         Alert.alert(
-          'Thank you!', 
+          "Thank you!",
           `Your ${rating}-star rating helps us improve the music analysis quality.`,
-          [{ text: 'OK', style: 'default' }]
+          [{ text: "OK", style: "default" }]
         );
       } else {
-        Alert.alert('Error', 'Failed to save your rating. Please try again.');
+        Alert.alert("Error", "Failed to save your rating. Please try again.");
       }
     } catch (error) {
-      console.error('Failed to save rating:', error);
-      Alert.alert('Error', 'Failed to save your rating. Please try again.');
+      console.error("Failed to save rating:", error);
+      Alert.alert("Error", "Failed to save your rating. Please try again.");
     }
   };
 
@@ -295,7 +244,9 @@ export default function MusicAnalysisScreen({ route, navigation }) {
     return (
       <View style={styles.progressContainer}>
         <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+          <View
+            style={[styles.progressFill, { width: `${progress * 100}%` }]}
+          />
         </View>
         <View style={styles.timeLabels}>
           <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
@@ -307,7 +258,7 @@ export default function MusicAnalysisScreen({ route, navigation }) {
 
   const renderBar = (bar, index) => {
     const isActive = currentBar === bar.id;
-    
+
     return (
       <BlurView
         key={bar.id}
@@ -315,7 +266,7 @@ export default function MusicAnalysisScreen({ route, navigation }) {
         style={[
           styles.barCard,
           GlassStyles.glassCard,
-          isActive && styles.activeBar
+          isActive && styles.activeBar,
         ]}
       >
         <TouchableOpacity
@@ -328,9 +279,11 @@ export default function MusicAnalysisScreen({ route, navigation }) {
             <View style={styles.barInfo}>
               <Text style={styles.barNumber}>Bar {bar.id + 1}</Text>
             </View>
-            
+
             <View style={styles.chordContainer}>
-              <Text style={[styles.chordText, isActive && styles.activeChordText]}>
+              <Text
+                style={[styles.chordText, isActive && styles.activeChordText]}
+              >
                 {bar.chord}
               </Text>
             </View>
@@ -338,7 +291,9 @@ export default function MusicAnalysisScreen({ route, navigation }) {
 
           {/* Lyrics */}
           <View style={styles.lyricsContainer}>
-            <Text style={[styles.lyricsText, isActive && styles.activeLyricsText]}>
+            <Text
+              style={[styles.lyricsText, isActive && styles.activeLyricsText]}
+            >
               {bar.lyrics}
             </Text>
           </View>
@@ -357,14 +312,16 @@ export default function MusicAnalysisScreen({ route, navigation }) {
                       style={[
                         styles.waveBar,
                         {
-                          transform: [{
-                            scaleY: progressAnimation.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: [0.3, 1],
-                              extrapolate: 'clamp'
-                            })
-                          }]
-                        }
+                          transform: [
+                            {
+                              scaleY: progressAnimation.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [0.3, 1],
+                                extrapolate: "clamp",
+                              }),
+                            },
+                          ],
+                        },
                       ]}
                     />
                   ))}
@@ -395,9 +352,12 @@ export default function MusicAnalysisScreen({ route, navigation }) {
             <Text style={styles.headerTitle}>Loading...</Text>
             <View style={styles.headerButton} />
           </View>
-          
+
           <View style={styles.loadingContainer}>
-            <BlurView intensity={20} style={[styles.loadingCard, GlassStyles.glassCard]}>
+            <BlurView
+              intensity={20}
+              style={[styles.loadingCard, GlassStyles.glassCard]}
+            >
               <Text style={styles.loadingText}>Analyzing Music...</Text>
             </BlurView>
           </View>
@@ -420,41 +380,55 @@ export default function MusicAnalysisScreen({ route, navigation }) {
           >
             <Ionicons name="arrow-back" size={24} color={Colors.lightGreen} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle} numberOfLines={1}>Music Analysis</Text>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            Music Analysis
+          </Text>
           <TouchableOpacity
             style={styles.headerButton}
-            onPress={() => Alert.alert('Download', 'Download MIDI file')}
+            onPress={() => Alert.alert("Download", "Download MIDI file")}
           >
-            <Ionicons name="download-outline" size={20} color={Colors.lightGreen} />
+            <Ionicons
+              name="download-outline"
+              size={20}
+              color={Colors.lightGreen}
+            />
           </TouchableOpacity>
         </View>
 
         {/* Song Info */}
-        <BlurView intensity={15} style={[styles.songInfoCard, GlassStyles.glassCard]}>
-          <Text style={styles.songTitle} numberOfLines={1}>{song.name}</Text>
+        <BlurView
+          intensity={15}
+          style={[styles.songInfoCard, GlassStyles.glassCard]}
+        >
+          <Text style={styles.songTitle} numberOfLines={1}>
+            {song.name}
+          </Text>
           <Text style={styles.artistName}>by {song.singerName}</Text>
           <Text style={styles.albumName}>from "{song.album}"</Text>
         </BlurView>
 
         {/* Player Control */}
-        <BlurView intensity={15} style={[styles.playerCard, GlassStyles.glassCard]}>
+        <BlurView
+          intensity={15}
+          style={[styles.playerCard, GlassStyles.glassCard]}
+        >
           <TouchableOpacity
             style={styles.playButton}
             onPress={handlePlayPause}
             activeOpacity={0.8}
           >
             <LinearGradient
-              colors={[Colors.lightGreen, '#059669']}
+              colors={[Colors.lightGreen, "#059669"]}
               style={styles.playButtonGradient}
             >
-              <Ionicons 
-                name={isPlaying ? "pause" : "play"} 
-                size={24} 
-                color={Colors.white} 
+              <Ionicons
+                name={isPlaying ? "pause" : "play"}
+                size={24}
+                color={Colors.white}
               />
             </LinearGradient>
           </TouchableOpacity>
-          
+
           <View style={styles.playerInfo}>
             <Text style={styles.playerTitle}>MIDI Playback</Text>
             <Text style={styles.playerSubtitle}>
@@ -467,14 +441,14 @@ export default function MusicAnalysisScreen({ route, navigation }) {
         {renderProgressBar()}
 
         {/* Bars with Chords and Lyrics */}
-        <ScrollView 
+        <ScrollView
           ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.barsContainer}
           showsVerticalScrollIndicator={false}
         >
           {musicData?.bars.map((bar, index) => renderBar(bar, index))}
-          
+
           {/* User Feedback Rating */}
           <StarRating
             onRatingChange={handleRatingChange}
@@ -483,7 +457,7 @@ export default function MusicAnalysisScreen({ route, navigation }) {
             maxStars={5}
             showFeedbackText={true}
           />
-          
+
           <View style={styles.bottomPadding} />
         </ScrollView>
       </SafeAreaView>
@@ -499,9 +473,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 16,
@@ -511,15 +485,15 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: Colors.white,
-    textAlign: 'center',
+    textAlign: "center",
     flex: 1,
     marginHorizontal: 12,
   },
@@ -527,54 +501,54 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingCard: {
     padding: 32,
     borderRadius: 16,
-    alignItems: 'center',
+    alignItems: "center",
   },
   loadingText: {
     fontSize: 18,
     color: Colors.white,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   songInfoCard: {
     marginHorizontal: 16,
     marginBottom: 16,
     padding: 16,
     borderRadius: 16,
-    alignItems: 'center',
+    alignItems: "center",
   },
   songTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: Colors.white,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 6,
   },
   artistName: {
     fontSize: 14,
     color: Colors.lightGreen,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 2,
   },
   albumName: {
     fontSize: 12,
     color: Colors.lightGray,
-    textAlign: 'center',
+    textAlign: "center",
     opacity: 0.8,
   },
   playerCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginHorizontal: 16,
     marginBottom: 16,
     padding: 16,
@@ -584,20 +558,20 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    overflow: 'hidden',
+    overflow: "hidden",
     marginRight: 16,
   },
   playButtonGradient: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   playerInfo: {
     flex: 1,
   },
   playerTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.white,
     marginBottom: 4,
   },
@@ -612,18 +586,18 @@ const styles = StyleSheet.create({
   },
   progressTrack: {
     height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
     borderRadius: 2,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   progressFill: {
-    height: '100%',
+    height: "100%",
     backgroundColor: Colors.lightGreen,
     borderRadius: 2,
   },
   timeLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginTop: 8,
   },
   timeText: {
@@ -641,12 +615,12 @@ const styles = StyleSheet.create({
   barCard: {
     marginBottom: 16,
     borderRadius: 16,
-    overflow: 'hidden',
+    overflow: "hidden",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: "rgba(255, 255, 255, 0.1)",
   },
   activeBar: {
-    borderColor: 'rgba(16, 185, 129, 0.4)',
+    borderColor: "rgba(16, 185, 129, 0.4)",
     shadowColor: Colors.lightGreen,
     shadowOffset: {
       width: 0,
@@ -660,15 +634,15 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   barHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 12,
   },
   barInfo: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   barNumber: {
     fontSize: 12,
@@ -677,16 +651,16 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   chordContainer: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderColor: "rgba(16, 185, 129, 0.3)",
   },
   chordText: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: Colors.lightGreen,
   },
   activeChordText: {
@@ -702,12 +676,12 @@ const styles = StyleSheet.create({
   },
   activeLyricsText: {
     color: Colors.lightGreen,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   timeIndicator: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   timeIndicatorText: {
     fontSize: 11,
@@ -715,12 +689,12 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   playingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   waveform: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginRight: 8,
   },
   waveBar: {
@@ -733,7 +707,7 @@ const styles = StyleSheet.create({
   nowPlayingText: {
     fontSize: 11,
     color: Colors.lightGreen,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   bottomPadding: {
     height: 20,

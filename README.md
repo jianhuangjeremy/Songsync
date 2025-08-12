@@ -74,23 +74,49 @@ src/
 
 The app is configured to work with a song identification API:
 
-- **Mock API Endpoint**: `http://localhost:8080/getSongName`
+- **API Endpoint**: `http://localhost:8080/identify-and-analyze`
 - **Request**: POST with audio file data
-- **Response**: Song information (name, album, artist, etc.)
+- **Response**: Complete song information including analysis data
 
 When the API is unavailable, the app falls back to mock data for demonstration purposes.
 
 ### Expected API Response Format
 
+Your backend should return song objects with complete analysis data:
+
 ```json
 {
+  "id": "unique_song_id",
   "name": "Song Name",
-  "album": "Album Name", 
   "singerName": "Artist Name",
+  "album": "Album Name",
   "duration": "3:45",
   "genre": "Pop",
   "year": "2023",
-  "confidence": 0.95
+  "confidence": 0.95,
+  "chords": ["C", "Am", "F", "G"],
+  "hasMidi": true,
+  "albumCover": "https://example.com/cover.jpg",
+  "previewUrl": "https://example.com/preview.mp3",
+  "analysisData": {
+    "midiFile": {
+      "id": "midi_id",
+      "name": "Song Title - Full Track", 
+      "size": "45 KB",
+      "downloadUrl": "https://example.com/midi/song.mid"
+    },
+    "bars": [
+      {
+        "id": 0,
+        "startTime": 0,
+        "endTime": 8,
+        "chord": "C",
+        "lyrics": "First line of lyrics",
+        "section": "Verse 1"
+      }
+    ],
+    "sections": ["Intro", "Verse 1", "Chorus", "Verse 2", "Chorus", "Bridge", "Outro"]
+  }
 }
 ```
 
