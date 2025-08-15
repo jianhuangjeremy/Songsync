@@ -10,8 +10,12 @@ import HomeScreen from './src/screens/HomeScreen';
 import AuthScreen from './src/screens/AuthScreen';
 import LibraryScreen from './src/screens/LibraryScreen';
 import MusicAnalysisScreen from './src/screens/MusicAnalysisScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
+import SubscriptionScreen from './src/screens/SubscriptionScreen';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { Colors } from './src/styles/Colors';
+import ProficiencyModal from './src/components/ProficiencyModal';
+import { UserPreferencesService } from './src/services/UserPreferencesService';
 
 // Global unhandled promise rejection handler
 const setupGlobalErrorHandlers = () => {
@@ -49,8 +53,30 @@ const Stack = createStackNavigator();
 
 function AppNavigator() {
   const { user, loading } = useAuth();
+  const [showProficiencyModal, setShowProficiencyModal] = useState(false);
+  const [isCheckingFirstTime, setIsCheckingFirstTime] = useState(true);
 
-  if (loading) {
+  useEffect(() => {
+    checkFirstTimeUser();
+  }, [user]);
+
+  const checkFirstTimeUser = async () => {
+    if (user) {
+      try {
+        const isFirstTime = await UserPreferencesService.isFirstTimeUser();
+        setShowProficiencyModal(isFirstTime);
+      } catch (error) {
+        console.error('Error checking first time user:', error);
+      }
+    }
+    setIsCheckingFirstTime(false);
+  };
+
+  const handleProficiencyComplete = () => {
+    setShowProficiencyModal(false);
+  };
+
+  if (loading || isCheckingFirstTime) {
     return (
       <View style={styles.loadingContainer}>
         <LinearGradient
@@ -64,48 +90,66 @@ function AppNavigator() {
   }
 
   return (
-    <NavigationContainer>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.black} />
-      <Stack.Navigator
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: 'transparent',
-          },
-          headerTintColor: Colors.lightGreen,
-          headerTransparent: true,
-          headerTitleStyle: {
-            fontWeight: 'bold',
-            fontSize: 20,
-          },
-        }}
-      >
-        {user ? (
-          <>
+    <>
+      <NavigationContainer>
+        <StatusBar barStyle="light-content" backgroundColor={Colors.black} />
+        <Stack.Navigator
+          screenOptions={{
+            headerStyle: {
+              backgroundColor: 'transparent',
+            },
+            headerTintColor: Colors.lightGreen,
+            headerTransparent: true,
+            headerTitleStyle: {
+              fontWeight: 'bold',
+              fontSize: 20,
+            },
+          }}
+        >
+          {user ? (
+            <>
+              <Stack.Screen 
+                name="Home" 
+                component={HomeScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="Library" 
+                component={LibraryScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="MusicAnalysis" 
+                component={MusicAnalysisScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="Settings" 
+                component={SettingsScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="Subscription" 
+                component={SubscriptionScreen}
+                options={{ headerShown: false }}
+              />
+            </>
+          ) : (
             <Stack.Screen 
-              name="Home" 
-              component={HomeScreen}
+              name="Auth" 
+              component={AuthScreen}
               options={{ headerShown: false }}
             />
-            <Stack.Screen 
-              name="Library" 
-              component={LibraryScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="MusicAnalysis" 
-              component={MusicAnalysisScreen}
-              options={{ headerShown: false }}
-            />
-          </>
-        ) : (
-          <Stack.Screen 
-            name="Auth" 
-            component={AuthScreen}
-            options={{ headerShown: false }}
-          />
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
+          )}
+        </Stack.Navigator>
+      </NavigationContainer>
+      
+      {/* First-time proficiency modal */}
+      <ProficiencyModal
+        visible={showProficiencyModal && !!user}
+        onComplete={handleProficiencyComplete}
+      />
+    </>
   );
 }
 

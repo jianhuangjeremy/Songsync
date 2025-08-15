@@ -20,8 +20,10 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '../context/AuthContext';
 import { identifySong, saveSongToLibrary, getLibrary, initializeDemoLibrary } from '../services/MusicService';
+import { SubscriptionService } from '../services/SubscriptionService';
 import SongResultModal from '../components/SongResultModal';
 import NoSongFoundModal from '../components/NoSongFoundModal';
+import UpgradeModal from '../components/UpgradeModal';
 import { Colors } from '../styles/Colors';
 import { GlassStyles } from '../styles/GlassStyles';
 
@@ -86,6 +88,9 @@ export default function HomeScreen({ navigation }) {
   const [songResults, setSongResults] = useState([]);
   const [showResults, setShowResults] = useState(false);
   const [showNoSongFoundModal, setShowNoSongFoundModal] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState('limit_reached');
+  const [subscriptionStatus, setSubscriptionStatus] = useState(null);
   const [recentResults, setRecentResults] = useState([]);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
@@ -117,6 +122,7 @@ export default function HomeScreen({ navigation }) {
     const initializeComponent = async () => {
       try {
         await loadRecentResults();
+        await loadSubscriptionStatus();
       } catch (error) {
         console.error('Error initializing component:', error);
       }
@@ -166,6 +172,15 @@ export default function HomeScreen({ navigation }) {
     rotateAnimation.stopAnimation();
     rotateAnimation.setValue(0);
     pulseAnimation.setValue(1);
+  };
+
+  const loadSubscriptionStatus = async () => {
+    try {
+      const status = await SubscriptionService.getSubscriptionStatus();
+      setSubscriptionStatus(status);
+    } catch (error) {
+      console.error('Error loading subscription status:', error);
+    }
   };
 
   const loadRecentResults = async () => {
@@ -228,6 +243,14 @@ export default function HomeScreen({ navigation }) {
 
   const startRecording = async () => {
     try {
+      // Check subscription limits before starting recording
+      const canIdentify = await SubscriptionService.canIdentifySongs();
+      if (!canIdentify.canUse) {
+        setUpgradeReason('limit_reached');
+        setShowUpgradeModal(true);
+        return;
+      }
+
       const hasPermission = await requestPermissions();
       if (!hasPermission) return;
 
@@ -310,11 +333,17 @@ export default function HomeScreen({ navigation }) {
 
   const handleSongIdentification = async (audioUri) => {
     try {
+      // Increment usage count for successful identification attempt
+      await SubscriptionService.incrementDailyUsage();
+      
       const results = await identifySong(audioUri);
       
       if (results && results.length > 0) {
         setSongResults(results);
         setShowResults(true);
+        
+        // Refresh subscription status to update UI
+        await loadSubscriptionStatus();
       } else {
         // No songs found - show the "no song found" modal
         setShowNoSongFoundModal(true);
@@ -358,31 +387,39 @@ export default function HomeScreen({ navigation }) {
     setShowNoSongFoundModal(false);
   };
 
-  const handlePlaySong = (song) => {
-    Alert.alert(
-      'Play Song',
-      `Would you like to play "${song.name}" by ${song.singerName}?`,
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Play on Spotify',
-          onPress: () => {
-            // In a real app, this would open Spotify with the song
-            Alert.alert('Opening Spotify...', `Searching for "${song.name}" by ${song.singerName}`);
-          },
-        },
-        {
-          text: 'Play on Apple Music',
-          onPress: () => {
-            // In a real app, this would open Apple Music with the song
-            Alert.alert('Opening Apple Music...', `Searching for "${song.name}" by ${song.singerName}`);
-          },
-        },
-      ]
-    );
+    const handlePlaySong = (song) => {
+    console.log('Playing song:', song.name);
+  };
+
+  const handleMidiDownload = async (song) => {
+    try {
+      const midiStatus = await SubscriptionService.canDownloadMidi();
+      
+      if (!midiStatus.canDownload) {
+        setUpgradeReason('midi_download');
+        setShowUpgradeModal(true);
+        return;
+      }
+
+      // If user can download, proceed with download
+      Alert.alert(
+        'Download MIDI',
+        `Download MIDI file for "${song.name}"?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Download',
+            onPress: () => {
+              // Mock download - replace with actual download logic
+              Alert.alert('Success', 'MIDI file downloaded successfully!');
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error checking MIDI download permission:', error);
+      Alert.alert('Error', 'Unable to download MIDI file. Please try again.');
+    }
   };
 
   const handleScroll = (event) => {
@@ -420,8 +457,29 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.header}>
           <View style={styles.userInfo}>
             <BlurView intensity={20} style={[styles.userCard, GlassStyles.glassContainer]}>
-              <Text style={styles.welcomeText}>Welcome back,</Text>
-              <Text style={styles.userName}>{user?.name || 'Music Lover'}</Text>
+              <View style={styles.userTextContainer}>
+                <Text style={styles.welcomeText}>Welcome back,</Text>
+                <Text style={styles.userName}>{user?.name || 'Music Lover'}</Text>
+              </View>
+              
+              {/* Usage Indicator inside user card */}
+              {subscriptionStatus && (
+                <View style={styles.inlineUsageIndicator}>
+                  <View style={styles.usageInfo}>
+                    <Text style={styles.usageText}>
+                      {subscriptionStatus.identificationStatus.used} / {
+                        subscriptionStatus.identificationStatus.limit === -1 
+                          ? '∞' 
+                          : subscriptionStatus.identificationStatus.limit
+                      }
+                    </Text>
+                    <Text style={styles.usageLabel}>Daily IDs</Text>
+                  </View>
+                  <View style={[styles.tierBadge, { backgroundColor: subscriptionStatus.config.color }]}>
+                    <Text style={styles.tierText}>{subscriptionStatus.config.name}</Text>
+                  </View>
+                </View>
+              )}
             </BlurView>
           </View>
           
@@ -435,9 +493,16 @@ export default function HomeScreen({ navigation }) {
             
             <TouchableOpacity
               style={[GlassStyles.glassButton, styles.headerButton]}
+              onPress={() => navigation.navigate('Settings')}
+            >
+              <Ionicons name="settings" size={24} color={Colors.purple} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[GlassStyles.glassButton, styles.headerButton]}
               onPress={signOut}
             >
-              <Ionicons name="log-out" size={24} color={Colors.purple} />
+              <Ionicons name="log-out" size={24} color={Colors.red} />
             </TouchableOpacity>
           </View>
         </View>
@@ -625,6 +690,7 @@ export default function HomeScreen({ navigation }) {
           onRetry={handleRetryRecording}
           onClose={() => setShowResults(false)}
           onPlaySong={handlePlaySong}
+          onDownloadMidi={handleMidiDownload}
           navigation={navigation}
         />
 
@@ -633,6 +699,18 @@ export default function HomeScreen({ navigation }) {
           visible={showNoSongFoundModal}
           onTryAgain={handleNoSongTryAgain}
           onGotIt={handleNoSongGotIt}
+        />
+
+        {/* Upgrade Modal */}
+        <UpgradeModal
+          visible={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+          onUpgrade={async (newTier) => {
+            setShowUpgradeModal(false);
+            await loadSubscriptionStatus();
+          }}
+          currentTier={subscriptionStatus?.tier}
+          reason={upgradeReason}
         />
       </SafeAreaView>
     </LinearGradient>
@@ -659,10 +737,16 @@ const styles = StyleSheet.create({
     maxWidth: '60%', // Reduce width to make it more compact
   },
   userCard: {
-    padding: 12, // Reduce padding for more compact look
-    marginRight: 12, // Reduce margin
-    borderRadius: 12, // Slightly smaller border radius
-    overflow: 'hidden', // Prevent content overflow
+    padding: 12,
+    marginRight: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  userTextContainer: {
+    flex: 1,
   },
   welcomeText: {
     fontSize: 12, // Slightly smaller font
@@ -920,5 +1004,51 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
     minHeight: 30,
+  },
+  usageIndicator: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    right: 20,
+    zIndex: 10,
+  },
+  inlineUsageIndicator: {
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  usageCard: {
+    ...GlassStyles.container,
+    padding: 8,
+    minWidth: 100,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  usageInfo: {
+    alignItems: 'center',
+  },
+  usageText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: Colors.white,
+    textAlign: 'center',
+  },
+  usageLabel: {
+    fontSize: 8,
+    color: Colors.white,
+    opacity: 0.7,
+    marginTop: 1,
+    textAlign: 'center',
+  },
+  tierBadge: {
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 6,
+    marginTop: 2,
+    minWidth: 30,
+    alignItems: 'center',
+  },
+  tierText: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 });

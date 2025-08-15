@@ -8,6 +8,8 @@ export const Colors = {
   white: '#FFFFFF',
   gray: '#6B7280',
   lightGray: '#D1D5DB',
+  red: '#EF4444',
+  orange: '#F97316',
   glass: 'rgba(255, 255, 255, 0.1)',
   glassBlur: 'rgba(0, 0, 0, 0.3)',
 };

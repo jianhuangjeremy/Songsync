@@ -18,8 +18,116 @@ import { Colors } from "../styles/Colors";
 import { GlassStyles } from "../styles/GlassStyles";
 import StarRating from "../components/StarRating";
 import { FeedbackService } from "../services/FeedbackService";
+import { UserPreferencesService, PROFICIENCY_CONFIG } from "../services/UserPreferencesService";
 
 const { width } = Dimensions.get("window");
+
+// Helper function to generate fallback data based on proficiency level
+const generateFallbackData = (song, config) => {
+  const basicChords = ['C', 'Am', 'F', 'G'];
+  const intermediateChords = ['C', 'Am7', 'F', 'G', 'Dm', 'Em', 'F/C', 'G/B'];
+  const advancedChords = ['Cmaj7', 'Am7', 'Fmaj7', 'G7', 'Dm7', 'Em7', 'F/C', 'G/B', 'Bb', 'Cmaj9'];
+
+  let chordsToUse = basicChords;
+  if (config?.showAdvancedChords) {
+    chordsToUse = config.maxChordsDisplayed > 6 ? advancedChords : intermediateChords;
+  }
+
+  const numBars = Math.min(config?.maxChordsDisplayed || 4, 8);
+  const bars = [];
+
+  for (let i = 0; i < numBars; i++) {
+    const chordIndex = i % chordsToUse.length;
+    bars.push({
+      id: i,
+      startTime: i * 8,
+      endTime: (i + 1) * 8,
+      chord: song.chords?.[chordIndex] || chordsToUse[chordIndex],
+      lyrics: config?.showBasicNotation ? 
+        `Measure ${i + 1} lyrics...` : 
+        `Sample lyrics for bar ${i + 1}...`,
+      section: i < 2 ? "Verse 1" : i < 4 ? "Chorus" : "Verse 2",
+      theory: config?.showComplexAnalysis ? {
+        key: 'C major',
+        function: getRomanNumeral(chordsToUse[chordIndex], 'C'),
+        tension: getTensionLevel(chordsToUse[chordIndex])
+      } : null,
+      timing: config?.showDetailedTiming ? {
+        beat: '4/4',
+        tempo: '120 BPM',
+        subdivision: 'quarter notes'
+      } : null
+    });
+  }
+
+  return {
+    midiFile: {
+      id: song.id || "1",
+      name: `${song.name} - Full Track`,
+      size: "45 KB",
+      downloadUrl: "https://example.com/midi/fallback.mid",
+    },
+    bars,
+    sections: config?.showComplexAnalysis ? 
+      ["Intro", "Verse 1", "Chorus", "Verse 2", "Chorus", "Bridge", "Outro"] :
+      ["Verse", "Chorus"],
+  };
+};
+
+// Helper function to adapt existing analysis data for proficiency level
+const adaptAnalysisForProficiency = (analysisData, config) => {
+  if (!analysisData || !config) return analysisData;
+
+  const adaptedBars = analysisData.bars?.slice(0, config.maxChordsDisplayed || 4).map(bar => ({
+    ...bar,
+    theory: config.showComplexAnalysis ? {
+      key: 'C major', // You could analyze this from the chord
+      function: getRomanNumeral(bar.chord, 'C'),
+      tension: getTensionLevel(bar.chord)
+    } : null,
+    timing: config.showDetailedTiming ? {
+      beat: '4/4',
+      tempo: '120 BPM',
+      subdivision: 'quarter notes'
+    } : null
+  }));
+
+  return {
+    ...analysisData,
+    bars: adaptedBars
+  };
+};
+
+// Helper function to get Roman numeral analysis
+const getRomanNumeral = (chord, key) => {
+  const romanNumerals = {
+    'C': 'I', 'Cmaj7': 'Imaj7', 'Cmaj9': 'Imaj9',
+    'Am': 'vi', 'Am7': 'vi7',
+    'F': 'IV', 'Fmaj7': 'IVmaj7', 'F/C': 'IV/5',
+    'G': 'V', 'G7': 'V7', 'G/B': 'V/3',
+    'Dm': 'ii', 'Dm7': 'ii7',
+    'Em': 'iii', 'Em7': 'iii7',
+    'Bb': 'bVII'
+  };
+  return romanNumerals[chord] || chord;
+};
+
+// Helper function to determine tension level
+const getTensionLevel = (chord) => {
+  if (chord.includes('7') || chord.includes('9')) return 'high';
+  if (chord.includes('m') || chord.includes('/')) return 'medium';
+  return 'low';
+};
+
+// Helper function to get tension color
+const getTensionColor = (tension) => {
+  switch (tension) {
+    case 'high': return Colors.red + '80';
+    case 'medium': return Colors.orange + '80';
+    case 'low': return Colors.lightGreen + '80';
+    default: return Colors.gray + '80';
+  }
+};
 
 export default function MusicAnalysisScreen({ route, navigation }) {
   const { song } = route.params;
@@ -30,6 +138,7 @@ export default function MusicAnalysisScreen({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [musicData, setMusicData] = useState(null);
   const [userRating, setUserRating] = useState(0);
+  const [proficiencyConfig, setProficiencyConfig] = useState(null);
 
   const progressAnimation = useRef(new Animated.Value(0)).current;
   const playbackInterval = useRef(null);
@@ -67,6 +176,11 @@ export default function MusicAnalysisScreen({ route, navigation }) {
 
   const loadMusicData = async () => {
     try {
+      // Load user proficiency level
+      const userProficiency = await UserPreferencesService.getProficiencyLevel();
+      const config = UserPreferencesService.getProficiencyConfig(userProficiency);
+      setProficiencyConfig(config);
+
       // Load existing rating for this song
       const existingRating = await FeedbackService.getRating(
         song.id || song.name
@@ -78,61 +192,13 @@ export default function MusicAnalysisScreen({ route, navigation }) {
       // Use the analysis data that was already fetched during song identification
       // No need for a separate API call since your backend returns everything together
       if (song.analysisData) {
-        setMusicData(song.analysisData);
+        // Adapt the analysis data based on proficiency level
+        const adaptedData = adaptAnalysisForProficiency(song.analysisData, config);
+        setMusicData(adaptedData);
       } else {
         // Fallback for songs that don't have analysis data (like library songs)
         // Generate basic analysis data structure for existing songs
-        const fallbackData = {
-          midiFile: {
-            id: song.id || "1",
-            name: `${song.name} - Full Track`,
-            size: "45 KB",
-            downloadUrl: "https://example.com/midi/fallback.mid",
-          },
-          bars: [
-            {
-              id: 0,
-              startTime: 0,
-              endTime: 8,
-              chord: song.chords?.[0] || "C",
-              lyrics: "Sample lyrics for this song...",
-              section: "Verse 1",
-            },
-            {
-              id: 1,
-              startTime: 8,
-              endTime: 16,
-              chord: song.chords?.[1] || "Am",
-              lyrics: "More sample lyrics...",
-              section: "Verse 1",
-            },
-            {
-              id: 2,
-              startTime: 16,
-              endTime: 24,
-              chord: song.chords?.[2] || "F",
-              lyrics: "Chorus section begins...",
-              section: "Chorus",
-            },
-            {
-              id: 3,
-              startTime: 24,
-              endTime: 32,
-              chord: song.chords?.[3] || "G",
-              lyrics: "Main hook of the song...",
-              section: "Chorus",
-            },
-          ],
-          sections: [
-            "Intro",
-            "Verse 1",
-            "Chorus",
-            "Verse 2",
-            "Chorus",
-            "Bridge",
-            "Outro",
-          ],
-        };
+        const fallbackData = generateFallbackData(song, config);
         setMusicData(fallbackData);
       }
     } catch (error) {
@@ -277,7 +343,14 @@ export default function MusicAnalysisScreen({ route, navigation }) {
           {/* Bar Header */}
           <View style={styles.barHeader}>
             <View style={styles.barInfo}>
-              <Text style={styles.barNumber}>Bar {bar.id + 1}</Text>
+              <Text style={styles.barNumber}>
+                {proficiencyConfig?.showBasicNotation ? `Measure ${bar.id + 1}` : `Bar ${bar.id + 1}`}
+              </Text>
+              {proficiencyConfig?.showComplexAnalysis && bar.theory && (
+                <Text style={styles.theoryText}>
+                  {bar.theory.function} • {bar.theory.key}
+                </Text>
+              )}
             </View>
 
             <View style={styles.chordContainer}>
@@ -286,6 +359,11 @@ export default function MusicAnalysisScreen({ route, navigation }) {
               >
                 {bar.chord}
               </Text>
+              {proficiencyConfig?.showComplexAnalysis && bar.theory && (
+                <View style={[styles.tensionIndicator, { backgroundColor: getTensionColor(bar.theory.tension) }]}>
+                  <Text style={styles.tensionText}>{bar.theory.tension}</Text>
+                </View>
+              )}
             </View>
           </View>
 
@@ -297,6 +375,24 @@ export default function MusicAnalysisScreen({ route, navigation }) {
               {bar.lyrics}
             </Text>
           </View>
+
+          {/* Timing Information (Advanced users only) */}
+          {proficiencyConfig?.showDetailedTiming && bar.timing && (
+            <View style={styles.timingContainer}>
+              <View style={styles.timingItem}>
+                <Ionicons name="time" size={14} color={Colors.gray} />
+                <Text style={styles.timingText}>{bar.timing.beat}</Text>
+              </View>
+              <View style={styles.timingItem}>
+                <Ionicons name="speedometer" size={14} color={Colors.gray} />
+                <Text style={styles.timingText}>{bar.timing.tempo}</Text>
+              </View>
+              <View style={styles.timingItem}>
+                <Ionicons name="musical-note" size={14} color={Colors.gray} />
+                <Text style={styles.timingText}>{bar.timing.subdivision}</Text>
+              </View>
+            </View>
+          )}
 
           {/* Time indicator */}
           <View style={styles.timeIndicator}>
@@ -383,6 +479,13 @@ export default function MusicAnalysisScreen({ route, navigation }) {
           <Text style={styles.headerTitle} numberOfLines={1}>
             Music Analysis
           </Text>
+          {proficiencyConfig && (
+            <View style={[styles.proficiencyBadge, { borderColor: proficiencyConfig.color }]}>
+              <Text style={[styles.proficiencyText, { color: proficiencyConfig.color }]}>
+                {proficiencyConfig.label}
+              </Text>
+            </View>
+          )}
           <TouchableOpacity
             style={styles.headerButton}
             onPress={() => Alert.alert("Download", "Download MIDI file")}
@@ -504,6 +607,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(0, 0, 0, 0.3)",
+  },
+  proficiencyBadge: {
+    position: 'absolute',
+    top: 45,
+    left: '50%',
+    transform: [{ translateX: -40 }],
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    backgroundColor: Colors.black + '60',
+  },
+  proficiencyText: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
   },
   loadingContainer: {
     flex: 1,
@@ -708,6 +827,46 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.lightGreen,
     fontWeight: "500",
+  },
+  // New styles for proficiency-based features
+  theoryText: {
+    fontSize: 10,
+    color: Colors.gray,
+    marginLeft: 8,
+    fontStyle: 'italic',
+  },
+  tensionIndicator: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 6,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  tensionText: {
+    fontSize: 8,
+    color: Colors.white,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+  },
+  timingContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.black + '20',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 8,
+  },
+  timingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  timingText: {
+    fontSize: 10,
+    color: Colors.gray,
   },
   bottomPadding: {
     height: 20,
