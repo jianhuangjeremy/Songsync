@@ -14,7 +14,7 @@ if (Platform.OS !== "web") {
   };
 }
 
-const API_BASE_URL = "http://localhost:8080";
+const API_BASE_URL = "http://localhost:5001";
 
 // Mock song database with complete analysis data (your backend will return this format)
 const MOCK_SONGS = [
@@ -207,33 +207,52 @@ const MOCK_SONGS = [
 /**
  * Identifies a song from audio and returns complete analysis data
  * This is the main function that your backend should implement
- * @param {string} audioUri - URI of the audio file to identify
+ * @param {string} audioData - URI of the audio file or base64 audio data
+ * @param {boolean} isBase64 - Whether audioData is base64 encoded audio
  * @returns {Promise<Array>} Array of song objects with complete analysis data
  */
-export const identifySong = async (audioUri) => {
+export const identifySong = async (audioData, isBase64 = false) => {
   try {
-    // For web or when FileSystem is not available, skip file check
-    if (Platform.OS !== "web" && FileSystem) {
-      const audioInfo = await FileSystem.getInfoAsync(audioUri);
+    let requestBody;
 
-      if (!audioInfo.exists) {
-        throw new Error("Audio file not found");
+    if (isBase64) {
+      // Handle base64 audio data
+      console.log(
+        "Sending base64 audio data to backend, length:",
+        audioData.length
+      );
+      requestBody = JSON.stringify({
+        audioData: audioData,
+        format: "base64",
+        timestamp: Date.now(),
+      });
+    } else {
+      // Handle file URI (existing logic)
+      // For web or when FileSystem is not available, skip file check
+      if (Platform.OS !== "web" && FileSystem) {
+        const audioInfo = await FileSystem.getInfoAsync(audioData);
+
+        if (!audioInfo.exists) {
+          throw new Error("Audio file not found");
+        }
       }
+
+      requestBody = JSON.stringify({
+        audioFile: audioData,
+        timestamp: Date.now(),
+      });
     }
 
     // Your backend endpoint - this should return complete song + analysis data
     try {
+      console.log("requestBody is ", JSON.stringify(requestBody));
       const response = await fetch(`${API_BASE_URL}/identify-and-analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           // Add any required headers for your service
         },
-        body: JSON.stringify({
-          audioFile: audioUri,
-          timestamp: Date.now(),
-          // Add other required fields for your backend
-        }),
+        body: requestBody,
       });
 
       if (response.ok) {
