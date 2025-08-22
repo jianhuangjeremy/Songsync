@@ -19,7 +19,10 @@ const { width, height } = Dimensions.get('window');
 export default function NoSongFoundModal({ 
   visible, 
   onTryAgain, 
-  onGotIt 
+  onGotIt,
+  retryCount = 0,
+  maxRetries = 2,
+  canRetry = true
 }) {
   return (
     <Modal
@@ -46,29 +49,62 @@ export default function NoSongFoundModal({
             </View>
 
             {/* Title */}
-            <Text style={styles.title}>Music Not Recognized</Text>
+            <Text style={styles.title}>
+              {retryCount === 0 ? "Music Not Recognized" : `Attempt ${retryCount + 1} Failed`}
+            </Text>
 
             {/* Description */}
             <Text style={styles.description}>
-              We couldn't identify the music playing. This could be due to background noise, 
-              low volume, or the song not being in our database.
+              {retryCount === 0 
+                ? "We couldn't identify the music playing. This could be due to background noise, low volume, or the song not being in our database."
+                : canRetry
+                  ? `Still having trouble identifying the music. You have ${maxRetries - retryCount} more attempt${maxRetries - retryCount === 1 ? '' : 's'} remaining.`
+                  : "We've tried multiple times but couldn't identify this music. This helps us improve our recognition system. Please try with a different song."
+              }
             </Text>
+
+            {/* Retry Counter */}
+            {retryCount > 0 && (
+              <View style={styles.retryCounter}>
+                <Text style={styles.retryCounterText}>
+                  Attempt {retryCount + 1} of {maxRetries + 1}
+                </Text>
+              </View>
+            )}
 
             {/* Buttons */}
             <View style={styles.buttonContainer}>
-              <TouchableOpacity
-                style={[styles.button, styles.tryAgainButton]}
-                onPress={onTryAgain}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={[Colors.lightGreen, '#059669']}
-                  style={styles.buttonGradient}
+              {canRetry ? (
+                <TouchableOpacity
+                  style={[styles.button, styles.tryAgainButton]}
+                  onPress={onTryAgain}
+                  activeOpacity={0.8}
                 >
-                  <Ionicons name="refresh" size={20} color={Colors.white} />
-                  <Text style={styles.tryAgainButtonText}>Try Again</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+                  <LinearGradient
+                    colors={[Colors.lightGreen, '#059669']}
+                    style={styles.buttonGradient}
+                  >
+                    <Ionicons name="refresh" size={20} color={Colors.white} />
+                    <Text style={styles.tryAgainButtonText}>
+                      {retryCount === 0 ? "Try Again" : "Retry"}
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.button, styles.giveUpButton]}
+                  onPress={onGotIt}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={[Colors.purple, '#7C3AED']}
+                    style={styles.buttonGradient}
+                  >
+                    <Ionicons name="musical-note-outline" size={20} color={Colors.white} />
+                    <Text style={styles.giveUpButtonText}>Try Different Song</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
                 style={[styles.button, styles.gotItButton]}
@@ -76,7 +112,9 @@ export default function NoSongFoundModal({
                 activeOpacity={0.8}
               >
                 <BlurView intensity={10} style={styles.gotItButtonBlur}>
-                  <Text style={styles.gotItButtonText}>Got It</Text>
+                  <Text style={styles.gotItButtonText}>
+                    {canRetry ? "Cancel" : "Got It"}
+                  </Text>
                 </BlurView>
               </TouchableOpacity>
             </View>
@@ -145,6 +183,21 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     opacity: 0.9,
   },
+  retryCounter: {
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  retryCounterText: {
+    fontSize: 14,
+    color: Colors.purple,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
   buttonContainer: {
     width: '100%',
     gap: 16,
@@ -173,6 +226,21 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   tryAgainButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.white,
+  },
+  giveUpButton: {
+    shadowColor: Colors.purple,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  giveUpButtonText: {
     fontSize: 18,
     fontWeight: '600',
     color: Colors.white,

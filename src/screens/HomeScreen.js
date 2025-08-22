@@ -12,6 +12,8 @@ import {
   Platform,
   Image,
   ScrollView,
+  TextInput,
+  Keyboard,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -24,8 +26,10 @@ import {
   saveSongToLibrary,
   getLibrary,
   initializeDemoLibrary,
+  searchSongs,
 } from "../services/MusicService";
 import { SubscriptionService } from "../services/SubscriptionService";
+import { IdentificationRetryService } from "../services/IdentificationRetryService";
 import SongResultModal from "../components/SongResultModal";
 import NoSongFoundModal from "../components/NoSongFoundModal";
 import UpgradeModal from "../components/UpgradeModal";
@@ -101,6 +105,18 @@ export default function HomeScreen({ navigation }) {
   const [contentHeight, setContentHeight] = useState(0);
   const [containerHeight, setContainerHeight] = useState(0);
   const scrollViewRef = useRef(null);
+  const recordingTimeoutRef = useRef(null);
+  const [recordingCountdown, setRecordingCountdown] = useState(0);
+  const countdownIntervalRef = useRef(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchInput, setShowSearchInput] = useState(false);
+  
+  // Retry mechanism state
+  const [retryCount, setRetryCount] = useState(0);
+  const [lastAudioData, setLastAudioData] = useState(null);
+  const [lastIsBase64, setLastIsBase64] = useState(false);
+  const [identificationSessionId, setIdentificationSessionId] = useState(null);
 
   const scaleAnimation = useRef(new Animated.Value(1)).current;
   const pulseAnimation = useRef(new Animated.Value(1)).current;
@@ -114,13 +130,23 @@ export default function HomeScreen({ navigation }) {
           .then((status) => {
             if (status.isRecording || status.isDoneRecording) {
               recording.stopAndUnloadAsync().catch((error) => {
-                // Silently handle cleanup errors
+                console.error("Error stopping recording on cleanup:", error);
               });
+            } else {
+              // Recording already unloaded, no action needed
             }
           })
           .catch(() => {
             // Recording already unloaded, no action needed
           });
+      }
+      // Clear recording timeout on cleanup
+      if (recordingTimeoutRef.current) {
+        clearTimeout(recordingTimeoutRef.current);
+      }
+      // Clear countdown interval on cleanup
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
       }
     };
   }, [recording]);
@@ -265,6 +291,18 @@ export default function HomeScreen({ navigation }) {
       if (Platform.OS === "web") {
         // For web demo, we'll simulate recording
         setIsRecording(true);
+        setRecordingCountdown(15);
+
+        // Start countdown
+        countdownIntervalRef.current = setInterval(() => {
+          setRecordingCountdown((prev) => {
+            if (prev <= 1) {
+              clearInterval(countdownIntervalRef.current);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
 
         // Animate button press
         Animated.spring(scaleAnimation, {
@@ -272,12 +310,12 @@ export default function HomeScreen({ navigation }) {
           useNativeDriver: true,
         }).start();
 
-        // Auto-stop after 3 seconds for demo
-        setTimeout(() => {
+        // Auto-stop after 15 seconds
+        recordingTimeoutRef.current = setTimeout(() => {
           if (isRecording) {
             stopRecording();
           }
-        }, 3000);
+        }, 15000);
       } else {
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: true,
@@ -290,12 +328,31 @@ export default function HomeScreen({ navigation }) {
 
         setRecording(newRecording);
         setIsRecording(true);
+        setRecordingCountdown(15);
+
+        // Start countdown
+        countdownIntervalRef.current = setInterval(() => {
+          setRecordingCountdown((prev) => {
+            if (prev <= 1) {
+              clearInterval(countdownIntervalRef.current);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
 
         // Animate button press
         Animated.spring(scaleAnimation, {
           toValue: 0.9,
           useNativeDriver: true,
         }).start();
+
+        // Auto-stop after 15 seconds
+        recordingTimeoutRef.current = setTimeout(() => {
+          if (isRecording) {
+            stopRecording();
+          }
+        }, 15000);
       }
     } catch (error) {
       console.error("Failed to start recording:", error);
@@ -307,6 +364,19 @@ export default function HomeScreen({ navigation }) {
     try {
       setIsRecording(false);
       setIsProcessing(true);
+
+      // Clear the auto-stop timeout if it exists
+      if (recordingTimeoutRef.current) {
+        clearTimeout(recordingTimeoutRef.current);
+        recordingTimeoutRef.current = null;
+      }
+
+      // Clear the countdown interval if it exists
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+      setRecordingCountdown(0);
 
       // Reset button animation
       Animated.spring(scaleAnimation, {
@@ -359,15 +429,52 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  const handleSongIdentification = async (audioData, isBase64 = false) => {
+  const handleSongIdentification = async (audioData, isBase64 = false, isRetry = false) => {
     try {
-      // Increment usage count for successful identification attempt
-      await SubscriptionService.incrementDailyUsage();
+      let sessionId = identificationSessionId;
+      
+      // If this is a new identification (not a retry), start a new session
+      if (!isRetry) {
+        // Reset retry count for new identification
+        setRetryCount(0);
+        
+        // Check subscription limits before starting recording (only for new attempts)
+        const canIdentify = await SubscriptionService.canIdentifySongs();
+        // Uncomment this when subscription limits are enforced
+        // if (!canIdentify.canUse) {
+        //   setUpgradeReason("limit_reached");
+        //   setShowUpgradeModal(true);
+        //   return;
+        // }
+        
+        // Start new identification session
+        sessionId = await IdentificationRetryService.startIdentificationSession(
+          user.id, 
+          audioData, 
+          isBase64
+        );
+        setIdentificationSessionId(sessionId);
+        setLastAudioData(audioData);
+        setLastIsBase64(isBase64);
+        
+        // Increment usage count only for new attempts (not retries)
+        await SubscriptionService.incrementDailyUsage();
+      }
 
-      // Pass base64 flag to identifySong function
-      const results = await identifySong(audioData, isBase64);
+      // Pass retry flag to identifySong function
+      const results = await identifySong(audioData, isBase64, isRetry);
+      
+      // Record this attempt in the retry service
+      const sessionData = await IdentificationRetryService.recordAttempt(
+        sessionId, 
+        results, 
+        isRetry
+      );
 
       if (results && results.length > 0) {
+        // Success - end the session
+        await IdentificationRetryService.endSession(sessionId, 'success', results[0]);
+        
         // Automatically navigate to music analysis with the first (best) result
         const bestResult = results[0]; // Take the first result (usually highest confidence)
 
@@ -385,12 +492,41 @@ export default function HomeScreen({ navigation }) {
 
         // Refresh subscription status to update UI
         await loadSubscriptionStatus();
+        
+        // Clear retry state
+        setRetryCount(0);
+        setIdentificationSessionId(null);
+        setLastAudioData(null);
+        setLastIsBase64(false);
       } else {
-        // No songs found - show the "no song found" modal
-        setShowNoSongFoundModal(true);
+        // No songs found - check if we can retry
+        if (sessionData.canRetry) {
+          setRetryCount(sessionData.attemptsMade);
+          setShowNoSongFoundModal(true);
+        } else {
+          // Max retries reached - end session as failed
+          await IdentificationRetryService.endSession(sessionId, 'failed');
+          setRetryCount(sessionData.attemptsMade);
+          setShowNoSongFoundModal(true);
+          
+          // Clear retry state
+          setIdentificationSessionId(null);
+          setLastAudioData(null);
+          setLastIsBase64(false);
+        }
       }
     } catch (error) {
       console.error("Song identification error:", error);
+      
+      // Record failed attempt if we have a session
+      if (identificationSessionId) {
+        try {
+          await IdentificationRetryService.recordAttempt(identificationSessionId, [], isRetry);
+        } catch (retryError) {
+          console.error("Failed to record retry attempt:", retryError);
+        }
+      }
+      
       Alert.alert("Error", "Failed to identify song. Please try again.");
     } finally {
       setIsProcessing(false);
@@ -416,16 +552,35 @@ export default function HomeScreen({ navigation }) {
     setSongResults([]);
   };
 
-  const handleNoSongTryAgain = () => {
+  const handleNoSongTryAgain = async () => {
     setShowNoSongFoundModal(false);
-    // Start recording again
-    setTimeout(() => {
-      startRecording();
-    }, 500); // Small delay for smooth transition
+    
+    if (lastAudioData && identificationSessionId) {
+      // Use stored audio data for retry
+      setIsProcessing(true);
+      setTimeout(async () => {
+        await handleSongIdentification(lastAudioData, lastIsBase64, true);
+      }, 500);
+    } else {
+      // Start new recording if no stored audio
+      setTimeout(() => {
+        startRecording();
+      }, 500);
+    }
   };
 
-  const handleNoSongGotIt = () => {
+  const handleNoSongGotIt = async () => {
     setShowNoSongFoundModal(false);
+    
+    // End the session as abandoned if we have one active
+    if (identificationSessionId) {
+      await IdentificationRetryService.endSession(identificationSessionId, 'abandoned');
+      setIdentificationSessionId(null);
+      setLastAudioData(null);
+      setLastIsBase64(false);
+    }
+    
+    setRetryCount(0);
   };
 
   const handlePlaySong = (song) => {
@@ -456,6 +611,40 @@ export default function HomeScreen({ navigation }) {
     } catch (error) {
       console.error("Error checking MIDI download permission:", error);
       Alert.alert("Error", "Unable to download MIDI file. Please try again.");
+    }
+  };
+
+  const handleSearchSong = async () => {
+    if (!searchQuery || searchQuery.trim().length === 0) {
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      setIsProcessing(true);
+      
+      const results = await searchSongs(searchQuery.trim());
+      
+      if (results && results.length > 0) {
+        setSongResults(results);
+        setShowResults(true);
+      } else {
+        setShowNoSongFoundModal(true);
+      }
+    } catch (error) {
+      console.error("Search error:", error);
+      Alert.alert("Error", "Failed to search songs. Please try again.");
+    } finally {
+      setIsSearching(false);
+      setIsProcessing(false);
+    }
+  };
+
+  const toggleSearchInput = () => {
+    setShowSearchInput(!showSearchInput);
+    if (showSearchInput) {
+      setSearchQuery("");
+      Keyboard.dismiss();
     }
   };
 
@@ -572,7 +761,7 @@ export default function HomeScreen({ navigation }) {
           <View style={styles.statusContainer}>
             <Text style={styles.statusText}>
               {isRecording
-                ? "Listening..."
+                ? `Listening... ${recordingCountdown}s`
                 : isProcessing
                 ? "Identifying song..."
                 : "Tap to identify ambient music"}
@@ -588,6 +777,58 @@ export default function HomeScreen({ navigation }) {
               <Text style={styles.scrollHintSubtext}>
                 ↓ Scroll down to see your recent discoveries
               </Text>
+            )}
+          </View>
+
+          {/* Search Interface */}
+          <View style={styles.searchContainer}>
+            {!showSearchInput && (
+              <TouchableOpacity
+                style={[styles.searchToggleButton, GlassStyles.glassButton]}
+                onPress={toggleSearchInput}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="search" size={24} color={Colors.lightGreen} />
+                <Text style={styles.searchToggleText}>Search Songs</Text>
+              </TouchableOpacity>
+            )}
+
+            {showSearchInput && (
+              <View style={[styles.searchInputContainer, GlassStyles.glassContainer]}>
+                <TextInput
+                  style={styles.searchInput}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Search by song name, artist, or lyrics..."
+                  placeholderTextColor={Colors.gray}
+                  autoFocus={true}
+                  onSubmitEditing={handleSearchSong}
+                  returnKeyType="search"
+                />
+                <View style={styles.searchButtonsContainer}>
+                  <TouchableOpacity
+                    style={[styles.searchButton, GlassStyles.glassButton]}
+                    onPress={handleSearchSong}
+                    disabled={!searchQuery.trim() || isSearching}
+                    activeOpacity={0.8}
+                  >
+                    {isSearching ? (
+                      <ActivityIndicator size="small" color={Colors.lightGreen} />
+                    ) : (
+                      <Ionicons name="search" size={20} color={Colors.lightGreen} />
+                    )}
+                    <Text style={styles.searchButtonText}>Search</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.cancelButton, GlassStyles.glassButton]}
+                    onPress={toggleSearchInput}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="close" size={20} color={Colors.purple} />
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             )}
           </View>
 
@@ -792,6 +1033,9 @@ export default function HomeScreen({ navigation }) {
           visible={showNoSongFoundModal}
           onTryAgain={handleNoSongTryAgain}
           onGotIt={handleNoSongGotIt}
+          retryCount={retryCount}
+          maxRetries={2}
+          canRetry={retryCount < 2}
         />
 
         {/* Upgrade Modal */}
@@ -1143,5 +1387,86 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontWeight: "bold",
     textAlign: "center",
+  },
+  // Search Interface Styles
+  searchContainer: {
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  searchToggleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 15,
+    backgroundColor: "rgba(139, 92, 246, 0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(139, 92, 246, 0.3)",
+  },
+  searchToggleText: {
+    color: Colors.lightGreen,
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 10,
+  },
+  searchInputContainer: {
+    borderRadius: 15,
+    padding: 20,
+    backgroundColor: "rgba(139, 92, 246, 0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(139, 92, 246, 0.2)",
+  },
+  searchInput: {
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 12,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
+    color: Colors.white,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: "rgba(139, 92, 246, 0.3)",
+    marginBottom: 15,
+  },
+  searchButtonsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  searchButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(16, 185, 129, 0.3)",
+  },
+  searchButtonText: {
+    color: Colors.lightGreen,
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 8,
+  },
+  cancelButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    backgroundColor: "rgba(139, 92, 246, 0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(139, 92, 246, 0.3)",
+  },
+  cancelButtonText: {
+    color: Colors.purple,
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 8,
   },
 });

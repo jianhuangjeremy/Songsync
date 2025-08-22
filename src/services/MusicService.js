@@ -209,9 +209,10 @@ const MOCK_SONGS = [
  * This is the main function that your backend should implement
  * @param {string} audioData - URI of the audio file or base64 audio data
  * @param {boolean} isBase64 - Whether audioData is base64 encoded audio
+ * @param {boolean} isRetryAttempt - Whether this is a retry attempt (don't deduct usage)
  * @returns {Promise<Array>} Array of song objects with complete analysis data
  */
-export const identifySong = async (audioData, isBase64 = false) => {
+export const identifySong = async (audioData, isBase64 = false, isRetryAttempt = false) => {
   try {
     let requestBody;
 
@@ -246,10 +247,13 @@ export const identifySong = async (audioData, isBase64 = false) => {
     // Your backend endpoint - this should return complete song + analysis data
     try {
       console.log("requestBody is ", JSON.stringify(requestBody));
+      console.log("isRetryAttempt:", isRetryAttempt);
+      
       const response = await fetch(`${API_BASE_URL}/identify-and-analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "X-Retry-Attempt": isRetryAttempt ? "true" : "false", // Tell backend this is a retry
           // Add any required headers for your service
         },
         body: requestBody,
@@ -600,5 +604,59 @@ export const initializeDemoLibrary = async (userId) => {
   } catch (error) {
     console.error("Initialize demo library error:", error);
     return [];
+  }
+};
+
+/**
+ * Search songs by name, artist, or lyrics
+ * @param {string} query - Search query
+ * @returns {Promise<Array>} Array of song objects matching the search
+ */
+export const searchSongs = async (query) => {
+  try {
+    if (!query || query.trim().length === 0) {
+      return [];
+    }
+
+    const searchQuery = query.toLowerCase().trim();
+    
+    // Search through mock songs database
+    const searchResults = MOCK_SONGS.filter(song => {
+      const nameMatch = song.name.toLowerCase().includes(searchQuery);
+      const artistMatch = song.singerName.toLowerCase().includes(searchQuery);
+      const albumMatch = song.album.toLowerCase().includes(searchQuery);
+      
+      // Check if any lyrics contain the search query
+      let lyricsMatch = false;
+      if (song.analysisData && song.analysisData.bars) {
+        lyricsMatch = song.analysisData.bars.some(bar => 
+          bar.lyrics && bar.lyrics.toLowerCase().includes(searchQuery)
+        );
+      }
+
+      return nameMatch || artistMatch || albumMatch || lyricsMatch;
+    });
+
+    // Add confidence scores based on match quality
+    const resultsWithConfidence = searchResults.map(song => {
+      let confidence = 0.5; // Base confidence
+
+      const nameMatch = song.name.toLowerCase().includes(searchQuery);
+      const artistMatch = song.singerName.toLowerCase().includes(searchQuery);
+      
+      if (nameMatch) confidence += 0.4;
+      if (artistMatch) confidence += 0.3;
+      
+      return {
+        ...song,
+        confidence: Math.min(confidence, 0.98) // Cap at 98%
+      };
+    });
+
+    // Sort by confidence (highest first)
+    return resultsWithConfidence.sort((a, b) => b.confidence - a.confidence);
+  } catch (error) {
+    console.error("Search songs error:", error);
+    throw new Error("Failed to search songs. Please try again.");
   }
 };
