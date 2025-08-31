@@ -86,7 +86,7 @@ if (Platform.OS === "web") {
 const { width, height } = Dimensions.get("window");
 
 export default function HomeScreen({ navigation }) {
-  const { user, signOut } = useAuth();
+  const { user, signOut, getValidAccessToken } = useAuth();
   const [recording, setRecording] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -361,11 +361,24 @@ export default function HomeScreen({ navigation }) {
 
   const handleSongIdentification = async (audioData, isBase64 = false) => {
     try {
+      // Check if user is authenticated
+      if (!getValidAccessToken) {
+        Alert.alert(
+          "Authentication Required",
+          "Please sign in to identify songs."
+        );
+        return;
+      }
+
       // Increment usage count for successful identification attempt
       await SubscriptionService.incrementDailyUsage();
 
-      // Pass base64 flag to identifySong function
-      const results = await identifySong(audioData, isBase64);
+      // Pass base64 flag and authentication function to identifySong function
+      const results = await identifySong(
+        audioData,
+        isBase64,
+        getValidAccessToken
+      );
 
       if (results && results.length > 0) {
         // Automatically navigate to music analysis with the first (best) result
@@ -391,7 +404,28 @@ export default function HomeScreen({ navigation }) {
       }
     } catch (error) {
       console.error("Song identification error:", error);
-      Alert.alert("Error", "Failed to identify song. Please try again.");
+
+      // Handle authentication errors specifically
+      if (
+        error.message.includes("Authentication") ||
+        error.message.includes("sign in")
+      ) {
+        Alert.alert(
+          "Authentication Required",
+          "Your session has expired. Please sign in again.",
+          [
+            {
+              text: "OK",
+              onPress: () => signOut(), // Force sign out to show login screen
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          "Error",
+          error.message || "Failed to identify song. Please try again."
+        );
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -442,17 +476,44 @@ export default function HomeScreen({ navigation }) {
         return;
       }
 
+      // Check if song has audio data
+      const audioFile = song.analysisData?.audioFile;
+      if (!audioFile?.downloadUrl) {
+        Alert.alert("Error", "No audio file available for this song.");
+        return;
+      }
+
       // If user can download, proceed with download
-      Alert.alert("Download MIDI", `Download MIDI file for "${song.name}"?`, [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Download",
-          onPress: () => {
-            // Mock download - replace with actual download logic
-            Alert.alert("Success", "MIDI file downloaded successfully!");
+      Alert.alert(
+        "Download Audio",
+        `Download backing track for "${song.name}"?\n\nFile: ${
+          audioFile.name
+        }\nSize: ${audioFile.size}\nFormat: ${audioFile.format || "m4a"}`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Download",
+            onPress: async () => {
+              try {
+                // Import MidiPlaybackService dynamically to avoid import issues
+                const { MidiPlaybackService } = await import(
+                  "../services/MidiPlaybackService"
+                );
+                await MidiPlaybackService.downloadMidiForUser(
+                  audioFile,
+                  song.name
+                );
+              } catch (error) {
+                console.error("Error downloading MIDI file:", error);
+                Alert.alert(
+                  "Error",
+                  "Failed to download MIDI file. Please try again."
+                );
+              }
+            },
           },
-        },
-      ]);
+        ]
+      );
     } catch (error) {
       console.error("Error checking MIDI download permission:", error);
       Alert.alert("Error", "Unable to download MIDI file. Please try again.");
