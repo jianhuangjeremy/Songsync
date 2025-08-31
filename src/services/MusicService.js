@@ -14,7 +14,7 @@ if (Platform.OS !== "web") {
   };
 }
 
-const API_BASE_URL = "http://localhost:5001";
+const API_BASE_URL = "http://localhost:3000"; // Node.js auth service
 
 // Mock song database with complete analysis data (your backend will return this format)
 const MOCK_SONGS = [
@@ -29,16 +29,27 @@ const MOCK_SONGS = [
     confidence: 0.95,
     chords: ["F", "C", "G", "Am"],
     hasMidi: true,
+    hasAudio: true,
     albumCover:
       "https://upload.wikimedia.org/wikipedia/en/6/6f/Pharrell_Williams_-_G_I_R_L.png",
     previewUrl: "https://www.soundjay.com/misc/sounds/bells-2.mp3",
     // Complete analysis data that your backend will return
     analysisData: {
-      midiFile: {
-        id: "1",
-        name: "Happy - Full Track",
-        size: "45 KB",
-        downloadUrl: "https://example.com/midi/full-track.mid",
+      audioFile: {
+        id: "audio_1",
+        name: "Happy - Backing Track",
+        filename: "pharrell_williams_happy_backing_track.m4a",
+        size: "8.5 MB",
+        downloadUrl:
+          "http://localhost:5001/static/audio/pharrell_williams_happy_backing_track.m4a",
+        format: "m4a",
+        duration_seconds: 233,
+        youtube_source: {
+          title: "Pharrell Williams - Happy (Official Backing Track)",
+          channel: "BackingTracksPro",
+          url: "https://www.youtube.com/watch?v=example1",
+          search_query: "Pharrell Williams Happy backing track",
+        },
       },
       bars: [
         {
@@ -129,15 +140,26 @@ const MOCK_SONGS = [
     confidence: 0.92,
     chords: ["Bb", "Eb", "F", "Cm"],
     hasMidi: true,
+    hasAudio: true,
     albumCover:
       "https://upload.wikimedia.org/wikipedia/en/4/4d/Queen_A_Night_At_The_Opera.png",
     previewUrl: "https://www.soundjay.com/misc/sounds/bells-1.mp3",
     analysisData: {
-      midiFile: {
-        id: "2",
-        name: "Bohemian Rhapsody - Full Track",
-        size: "78 KB",
-        downloadUrl: "https://example.com/midi/bohemian-rhapsody.mid",
+      audioFile: {
+        id: "audio_2",
+        name: "Bohemian Rhapsody - Backing Track",
+        filename: "queen_bohemian_rhapsody_backing_track.m4a",
+        size: "12.8 MB",
+        downloadUrl:
+          "http://localhost:5001/static/audio/queen_bohemian_rhapsody_backing_track.m4a",
+        format: "m4a",
+        duration_seconds: 355,
+        youtube_source: {
+          title: "Queen - Bohemian Rhapsody (Official Backing Track)",
+          channel: "BackingTracksPro",
+          url: "https://www.youtube.com/watch?v=example2",
+          search_query: "Queen Bohemian Rhapsody backing track",
+        },
       },
       bars: [
         {
@@ -171,15 +193,26 @@ const MOCK_SONGS = [
     confidence: 0.88,
     chords: ["C#m", "F#m", "A", "B"],
     hasMidi: true,
+    hasAudio: true,
     albumCover:
       "https://upload.wikimedia.org/wikipedia/en/4/45/Divide_cover.png",
     previewUrl: "https://www.soundjay.com/misc/sounds/bells-3.mp3",
     analysisData: {
-      midiFile: {
-        id: "3",
-        name: "Shape of You - Full Track",
-        size: "52 KB",
-        downloadUrl: "https://example.com/midi/shape-of-you.mid",
+      audioFile: {
+        id: "audio_3",
+        name: "Shape of You - Backing Track",
+        filename: "ed_sheeran_shape_of_you_backing_track.m4a",
+        size: "6.2 MB",
+        downloadUrl:
+          "http://localhost:5001/static/audio/ed_sheeran_shape_of_you_backing_track.m4a",
+        format: "m4a",
+        duration_seconds: 233,
+        youtube_source: {
+          title: "Ed Sheeran - Shape of You (Official Backing Track)",
+          channel: "BackingTracksPro",
+          url: "https://www.youtube.com/watch?v=example3",
+          search_query: "Ed Sheeran Shape of You backing track",
+        },
       },
       bars: [
         {
@@ -209,11 +242,24 @@ const MOCK_SONGS = [
  * This is the main function that your backend should implement
  * @param {string} audioData - URI of the audio file or base64 audio data
  * @param {boolean} isBase64 - Whether audioData is base64 encoded audio
+ * @param {function} getValidAccessToken - Function to get valid access token
  * @param {boolean} isRetryAttempt - Whether this is a retry attempt (don't deduct usage)
  * @returns {Promise<Array>} Array of song objects with complete analysis data
  */
-export const identifySong = async (audioData, isBase64 = false, isRetryAttempt = false) => {
+export const identifySong = async (
+  audioData,
+  isBase64 = false,
+  getValidAccessToken,
+  isRetryAttempt = false
+) => {
   try {
+    // Get valid access token for authentication
+    if (!getValidAccessToken) {
+      throw new Error("Authentication required. Please sign in again.");
+    }
+
+    const accessToken = await getValidAccessToken();
+
     let requestBody;
 
     if (isBase64) {
@@ -244,17 +290,17 @@ export const identifySong = async (audioData, isBase64 = false, isRetryAttempt =
       });
     }
 
-    // Your backend endpoint - this should return complete song + analysis data
+    // Send authenticated request to Node.js service (which proxies to Python)
     try {
       console.log("requestBody is ", JSON.stringify(requestBody));
       console.log("isRetryAttempt:", isRetryAttempt);
-      
+
       const response = await fetch(`${API_BASE_URL}/identify-and-analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
           "X-Retry-Attempt": isRetryAttempt ? "true" : "false", // Tell backend this is a retry
-          // Add any required headers for your service
         },
         body: requestBody,
       });
@@ -262,32 +308,50 @@ export const identifySong = async (audioData, isBase64 = false, isRetryAttempt =
       if (response.ok) {
         const result = await response.json();
 
-        // Your backend should return an array of song objects with this structure:
-        // {
-        //   id: string,
-        //   name: string,
-        //   singerName: string,
-        //   album: string,
-        //   duration: string,
-        //   genre: string,
-        //   year: string,
-        //   confidence: number (0-1),
-        //   chords: array,
-        //   hasMidi: boolean,
-        //   albumCover: string (URL),
-        //   previewUrl: string (URL),
-        //   analysisData: {
-        //     midiFile: { id, name, size, downloadUrl },
-        //     bars: [{ id, startTime, endTime, chord, lyrics, section }],
-        //     sections: [string array]
-        //   }
-        // }
+        // Process the results to ensure audio URLs are absolute
+        const processedResults = (
+          Array.isArray(result) ? result : [result]
+        ).map((song) => ({
+          ...song,
+          analysisData: song.analysisData
+            ? {
+                ...song.analysisData,
+                audioFile: song.analysisData.audioFile
+                  ? {
+                      ...song.analysisData.audioFile,
+                      // Ensure downloadUrl is absolute
+                      downloadUrl:
+                        song.analysisData.audioFile.downloadUrl?.startsWith(
+                          "http"
+                        )
+                          ? song.analysisData.audioFile.downloadUrl
+                          : `${API_BASE_URL}${song.analysisData.audioFile.downloadUrl}`,
+                    }
+                  : null,
+              }
+            : null,
+        }));
 
-        return Array.isArray(result) ? result : [result];
+        return processedResults;
+      } else if (response.status === 401) {
+        throw new Error("Authentication failed. Please sign in again.");
+      } else if (response.status === 403) {
+        throw new Error("Access denied. Please check your subscription.");
       } else {
-        throw new Error("API call failed");
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: "Unknown error" }));
+        throw new Error(errorData.error || "API call failed");
       }
     } catch (apiError) {
+      // Re-throw authentication errors
+      if (
+        apiError.message.includes("Authentication") ||
+        apiError.message.includes("sign in")
+      ) {
+        throw apiError;
+      }
+
       console.log("API unavailable, using mock data:", apiError.message);
 
       // Simulate different scenarios for demo
@@ -308,6 +372,15 @@ export const identifySong = async (audioData, isBase64 = false, isRetryAttempt =
     }
   } catch (error) {
     console.error("Song identification error:", error);
+
+    // Re-throw authentication errors to be handled by UI
+    if (
+      error.message.includes("Authentication") ||
+      error.message.includes("sign in")
+    ) {
+      throw error;
+    }
+
     throw new Error("Failed to identify song. Please try again.");
   }
 };
@@ -367,11 +440,26 @@ export const getLibrary = async (userId) => {
           return {
             ...song,
             analysisData: {
-              midiFile: {
-                id: song.id || "1",
-                name: `${song.name} - Full Track`,
-                size: "45 KB",
-                downloadUrl: "https://example.com/midi/fallback.mid",
+              audioFile: {
+                id: `audio_${song.id || "1"}`,
+                name: `${song.name} - Backing Track`,
+                filename: `${
+                  song.name?.replace(/[^a-z0-9]/gi, "_") || "song"
+                }_backing_track.m4a`,
+                size: "6.5 MB",
+                downloadUrl: `http://localhost:5001/static/audio/${
+                  song.name?.replace(/[^a-z0-9]/gi, "_") || "fallback"
+                }_backing_track.m4a`,
+                format: "m4a",
+                duration_seconds: 240,
+                youtube_source: {
+                  title: `${song.name} - Backing Track`,
+                  channel: "BackingTracksPro",
+                  url: "https://www.youtube.com/watch?v=fallback",
+                  search_query: `${song.singerName || "Artist"} ${
+                    song.name
+                  } backing track`,
+                },
               },
               bars: [
                 {
@@ -516,11 +604,26 @@ export const initializeDemoLibrary = async (userId) => {
           return {
             ...song,
             analysisData: {
-              midiFile: {
-                id: song.id || "1",
-                name: `${song.name} - Full Track`,
-                size: "45 KB",
-                downloadUrl: "https://example.com/midi/fallback.mid",
+              audioFile: {
+                id: `audio_${song.id || "1"}`,
+                name: `${song.name} - Backing Track`,
+                filename: `${
+                  song.name?.replace(/[^a-z0-9]/gi, "_") || "song"
+                }_backing_track.m4a`,
+                size: "6.5 MB",
+                downloadUrl: `http://localhost:5001/static/audio/${
+                  song.name?.replace(/[^a-z0-9]/gi, "_") || "fallback"
+                }_backing_track.m4a`,
+                format: "m4a",
+                duration_seconds: 240,
+                youtube_source: {
+                  title: `${song.name} - Backing Track`,
+                  channel: "BackingTracksPro",
+                  url: "https://www.youtube.com/watch?v=fallback",
+                  search_query: `${song.singerName || "Artist"} ${
+                    song.name
+                  } backing track`,
+                },
               },
               bars: [
                 {
@@ -619,18 +722,18 @@ export const searchSongs = async (query) => {
     }
 
     const searchQuery = query.toLowerCase().trim();
-    
+
     // Search through mock songs database
-    const searchResults = MOCK_SONGS.filter(song => {
+    const searchResults = MOCK_SONGS.filter((song) => {
       const nameMatch = song.name.toLowerCase().includes(searchQuery);
       const artistMatch = song.singerName.toLowerCase().includes(searchQuery);
       const albumMatch = song.album.toLowerCase().includes(searchQuery);
-      
+
       // Check if any lyrics contain the search query
       let lyricsMatch = false;
       if (song.analysisData && song.analysisData.bars) {
-        lyricsMatch = song.analysisData.bars.some(bar => 
-          bar.lyrics && bar.lyrics.toLowerCase().includes(searchQuery)
+        lyricsMatch = song.analysisData.bars.some(
+          (bar) => bar.lyrics && bar.lyrics.toLowerCase().includes(searchQuery)
         );
       }
 
@@ -638,18 +741,18 @@ export const searchSongs = async (query) => {
     });
 
     // Add confidence scores based on match quality
-    const resultsWithConfidence = searchResults.map(song => {
+    const resultsWithConfidence = searchResults.map((song) => {
       let confidence = 0.5; // Base confidence
 
       const nameMatch = song.name.toLowerCase().includes(searchQuery);
       const artistMatch = song.singerName.toLowerCase().includes(searchQuery);
-      
+
       if (nameMatch) confidence += 0.4;
       if (artistMatch) confidence += 0.3;
-      
+
       return {
         ...song,
-        confidence: Math.min(confidence, 0.98) // Cap at 98%
+        confidence: Math.min(confidence, 0.98), // Cap at 98%
       };
     });
 

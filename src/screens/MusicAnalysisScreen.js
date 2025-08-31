@@ -8,6 +8,7 @@ import {
   Dimensions,
   Alert,
   Animated,
+  Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -18,19 +19,36 @@ import { Colors } from "../styles/Colors";
 import { GlassStyles } from "../styles/GlassStyles";
 import StarRating from "../components/StarRating";
 import { FeedbackService } from "../services/FeedbackService";
-import { UserPreferencesService, PROFICIENCY_CONFIG } from "../services/UserPreferencesService";
+import {
+  UserPreferencesService,
+  PROFICIENCY_CONFIG,
+} from "../services/UserPreferencesService";
+import { MidiPlaybackService } from "../services/MidiPlaybackService";
+import { SubscriptionService } from "../services/SubscriptionService";
 
 const { width } = Dimensions.get("window");
 
 // Helper function to generate fallback data based on proficiency level
 const generateFallbackData = (song, config) => {
-  const basicChords = ['C', 'Am', 'F', 'G'];
-  const intermediateChords = ['C', 'Am7', 'F', 'G', 'Dm', 'Em', 'F/C', 'G/B'];
-  const advancedChords = ['Cmaj7', 'Am7', 'Fmaj7', 'G7', 'Dm7', 'Em7', 'F/C', 'G/B', 'Bb', 'Cmaj9'];
+  const basicChords = ["C", "Am", "F", "G"];
+  const intermediateChords = ["C", "Am7", "F", "G", "Dm", "Em", "F/C", "G/B"];
+  const advancedChords = [
+    "Cmaj7",
+    "Am7",
+    "Fmaj7",
+    "G7",
+    "Dm7",
+    "Em7",
+    "F/C",
+    "G/B",
+    "Bb",
+    "Cmaj9",
+  ];
 
   let chordsToUse = basicChords;
   if (config?.showAdvancedChords) {
-    chordsToUse = config.maxChordsDisplayed > 6 ? advancedChords : intermediateChords;
+    chordsToUse =
+      config.maxChordsDisplayed > 6 ? advancedChords : intermediateChords;
   }
 
   const numBars = Math.min(config?.maxChordsDisplayed || 4, 8);
@@ -43,34 +61,46 @@ const generateFallbackData = (song, config) => {
       startTime: i * 8,
       endTime: (i + 1) * 8,
       chord: song.chords?.[chordIndex] || chordsToUse[chordIndex],
-      lyrics: config?.showBasicNotation ? 
-        `Measure ${i + 1} lyrics...` : 
-        `Sample lyrics for bar ${i + 1}...`,
+      lyrics: config?.showBasicNotation
+        ? `Measure ${i + 1} lyrics...`
+        : `Sample lyrics for bar ${i + 1}...`,
       section: i < 2 ? "Verse 1" : i < 4 ? "Chorus" : "Verse 2",
-      theory: config?.showComplexAnalysis ? {
-        key: 'C major',
-        function: getRomanNumeral(chordsToUse[chordIndex], 'C'),
-        tension: getTensionLevel(chordsToUse[chordIndex])
-      } : null,
-      timing: config?.showDetailedTiming ? {
-        beat: '4/4',
-        tempo: '120 BPM',
-        subdivision: 'quarter notes'
-      } : null
+      theory: config?.showComplexAnalysis
+        ? {
+            key: "C major",
+            function: getRomanNumeral(chordsToUse[chordIndex], "C"),
+            tension: getTensionLevel(chordsToUse[chordIndex]),
+          }
+        : null,
+      timing: config?.showDetailedTiming
+        ? {
+            beat: "4/4",
+            tempo: "120 BPM",
+            subdivision: "quarter notes",
+          }
+        : null,
     });
   }
 
   return {
     midiFile: {
       id: song.id || "1",
-      name: `${song.name} - Full Track`,
+      name: `${song.name} - Backing Track`,
+      filename: `${
+        song.name?.replace(/[^a-z0-9]/gi, "_") || "song"
+      }_backing_track.mid`,
       size: "45 KB",
-      downloadUrl: "https://example.com/midi/fallback.mid",
+      downloadUrl: `http://localhost:5001/static/midi/${
+        song.name?.replace(/[^a-z0-9]/gi, "_") || "fallback"
+      }_backing_track.mid`,
+      tempo_bpm: 120,
+      num_measures: numBars,
+      tracks: ["drums", "bass", "piano"],
     },
     bars,
-    sections: config?.showComplexAnalysis ? 
-      ["Intro", "Verse 1", "Chorus", "Verse 2", "Chorus", "Bridge", "Outro"] :
-      ["Verse", "Chorus"],
+    sections: config?.showComplexAnalysis
+      ? ["Intro", "Verse 1", "Chorus", "Verse 2", "Chorus", "Bridge", "Outro"]
+      : ["Verse", "Chorus"],
   };
 };
 
@@ -78,54 +108,73 @@ const generateFallbackData = (song, config) => {
 const adaptAnalysisForProficiency = (analysisData, config) => {
   if (!analysisData || !config) return analysisData;
 
-  const adaptedBars = analysisData.bars?.slice(0, config.maxChordsDisplayed || 4).map(bar => ({
-    ...bar,
-    theory: config.showComplexAnalysis ? {
-      key: 'C major', // You could analyze this from the chord
-      function: getRomanNumeral(bar.chord, 'C'),
-      tension: getTensionLevel(bar.chord)
-    } : null,
-    timing: config.showDetailedTiming ? {
-      beat: '4/4',
-      tempo: '120 BPM',
-      subdivision: 'quarter notes'
-    } : null
-  }));
+  const adaptedBars = analysisData.bars
+    ?.slice(0, config.maxChordsDisplayed || 4)
+    .map((bar) => ({
+      ...bar,
+      theory: config.showComplexAnalysis
+        ? {
+            key: "C major", // You could analyze this from the chord
+            function: getRomanNumeral(bar.chord, "C"),
+            tension: getTensionLevel(bar.chord),
+          }
+        : null,
+      timing: config.showDetailedTiming
+        ? {
+            beat: "4/4",
+            tempo: "120 BPM",
+            subdivision: "quarter notes",
+          }
+        : null,
+    }));
 
   return {
     ...analysisData,
-    bars: adaptedBars
+    bars: adaptedBars,
   };
 };
 
 // Helper function to get Roman numeral analysis
 const getRomanNumeral = (chord, key) => {
   const romanNumerals = {
-    'C': 'I', 'Cmaj7': 'Imaj7', 'Cmaj9': 'Imaj9',
-    'Am': 'vi', 'Am7': 'vi7',
-    'F': 'IV', 'Fmaj7': 'IVmaj7', 'F/C': 'IV/5',
-    'G': 'V', 'G7': 'V7', 'G/B': 'V/3',
-    'Dm': 'ii', 'Dm7': 'ii7',
-    'Em': 'iii', 'Em7': 'iii7',
-    'Bb': 'bVII'
+    C: "I",
+    Cmaj7: "Imaj7",
+    Cmaj9: "Imaj9",
+    Am: "vi",
+    Am7: "vi7",
+    F: "IV",
+    Fmaj7: "IVmaj7",
+    "F/C": "IV/5",
+    G: "V",
+    G7: "V7",
+    "G/B": "V/3",
+    Dm: "ii",
+    Dm7: "ii7",
+    Em: "iii",
+    Em7: "iii7",
+    Bb: "bVII",
   };
   return romanNumerals[chord] || chord;
 };
 
 // Helper function to determine tension level
 const getTensionLevel = (chord) => {
-  if (chord.includes('7') || chord.includes('9')) return 'high';
-  if (chord.includes('m') || chord.includes('/')) return 'medium';
-  return 'low';
+  if (chord.includes("7") || chord.includes("9")) return "high";
+  if (chord.includes("m") || chord.includes("/")) return "medium";
+  return "low";
 };
 
 // Helper function to get tension color
 const getTensionColor = (tension) => {
   switch (tension) {
-    case 'high': return Colors.red + '80';
-    case 'medium': return Colors.orange + '80';
-    case 'low': return Colors.lightGreen + '80';
-    default: return Colors.gray + '80';
+    case "high":
+      return Colors.red + "80";
+    case "medium":
+      return Colors.orange + "80";
+    case "low":
+      return Colors.lightGreen + "80";
+    default:
+      return Colors.gray + "80";
   }
 };
 
@@ -140,8 +189,17 @@ export default function MusicAnalysisScreen({ route, navigation }) {
   const [userRating, setUserRating] = useState(0);
   const [proficiencyConfig, setProficiencyConfig] = useState(null);
 
+  // MIDI playback state
+  const [isMidiPlaying, setIsMidiPlaying] = useState(false);
+  const [midiLoading, setMidiLoading] = useState(false);
+  const [midiLoaded, setMidiLoaded] = useState(false);
+  const [midiCurrentTime, setMidiCurrentTime] = useState(0);
+  const [midiDuration, setMidiDuration] = useState(0);
+  const [midiError, setMidiError] = useState(null);
+
   const progressAnimation = useRef(new Animated.Value(0)).current;
   const playbackInterval = useRef(null);
+  const midiStatusInterval = useRef(null);
   const scrollViewRef = useRef(null);
 
   useEffect(() => {
@@ -171,14 +229,21 @@ export default function MusicAnalysisScreen({ route, navigation }) {
       if (playbackInterval.current) {
         clearInterval(playbackInterval.current);
       }
+      if (midiStatusInterval.current) {
+        clearInterval(midiStatusInterval.current);
+      }
+      // Cleanup MIDI player when component unmounts
+      MidiPlaybackService.cleanupMidiPlayer(song.id);
     };
   }, []);
 
   const loadMusicData = async () => {
     try {
       // Load user proficiency level
-      const userProficiency = await UserPreferencesService.getProficiencyLevel();
-      const config = UserPreferencesService.getProficiencyConfig(userProficiency);
+      const userProficiency =
+        await UserPreferencesService.getProficiencyLevel();
+      const config =
+        UserPreferencesService.getProficiencyConfig(userProficiency);
       setProficiencyConfig(config);
 
       // Load existing rating for this song
@@ -193,7 +258,10 @@ export default function MusicAnalysisScreen({ route, navigation }) {
       // No need for a separate API call since your backend returns everything together
       if (song.analysisData) {
         // Adapt the analysis data based on proficiency level
-        const adaptedData = adaptAnalysisForProficiency(song.analysisData, config);
+        const adaptedData = adaptAnalysisForProficiency(
+          song.analysisData,
+          config
+        );
         setMusicData(adaptedData);
       } else {
         // Fallback for songs that don't have analysis data (like library songs)
@@ -271,6 +339,158 @@ export default function MusicAnalysisScreen({ route, navigation }) {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  // Audio playback functions
+  const loadMidiFile = async () => {
+    try {
+      if (!musicData?.audioFile?.downloadUrl) {
+        setMidiError("No audio file available");
+        return;
+      }
+
+      setMidiLoading(true);
+      setMidiError(null);
+
+      console.log("Loading audio file:", musicData.audioFile.downloadUrl);
+
+      // Download and load audio file
+      const localPath = await MidiPlaybackService.downloadMidiFile(
+        musicData.audioFile,
+        song.id
+      );
+
+      await MidiPlaybackService.loadMidiFile(localPath, song.id);
+
+      // Set up status update callback
+      MidiPlaybackService.setPlaybackStatusUpdate(song.id, (status) => {
+        setIsMidiPlaying(status.isPlaying);
+        setMidiCurrentTime(status.positionMillis / 1000);
+        setMidiDuration(status.durationMillis / 1000);
+
+        // Update chord progression based on MIDI playback time
+        if (status.isPlaying && musicData) {
+          const currentSeconds = status.positionMillis / 1000;
+          const bar = musicData.bars.find(
+            (bar) =>
+              currentSeconds >= bar.startTime && currentSeconds < bar.endTime
+          );
+          if (bar && bar.id !== currentBar) {
+            setCurrentBar(bar.id);
+            // Auto-scroll to current bar
+            setTimeout(() => {
+              scrollViewRef.current?.scrollTo({
+                y: bar.id * 120,
+                animated: true,
+              });
+            }, 100);
+          }
+        }
+      });
+
+      setMidiLoaded(true);
+      setMidiLoading(false);
+      console.log("MIDI file loaded successfully");
+    } catch (error) {
+      console.error("Error loading MIDI file:", error);
+      setMidiError(error.message);
+      setMidiLoading(false);
+
+      if (error.message.includes("Premium subscription required")) {
+        Alert.alert(
+          "Premium Required",
+          "MIDI playback requires a Premium subscription. Upgrade to unlock backing tracks and enhanced features.",
+          [{ text: "OK" }]
+        );
+      } else {
+        Alert.alert("Error", "Failed to load MIDI file. Please try again.");
+      }
+    }
+  };
+
+  const handleMidiPlayPause = async () => {
+    try {
+      if (!midiLoaded) {
+        await loadMidiFile();
+        return;
+      }
+
+      if (isMidiPlaying) {
+        await MidiPlaybackService.pauseMidi(song.id);
+        setIsMidiPlaying(false);
+      } else {
+        await MidiPlaybackService.playMidi(song.id);
+        setIsMidiPlaying(true);
+      }
+    } catch (error) {
+      console.error("Error controlling MIDI playback:", error);
+      Alert.alert(
+        "Error",
+        "Failed to control MIDI playback. Please try again."
+      );
+    }
+  };
+
+  const handleMidiSeek = async (barId) => {
+    try {
+      if (!midiLoaded || !musicData) return;
+
+      const bar = musicData.bars[barId];
+      if (bar) {
+        const positionMs = bar.startTime * 1000;
+        await MidiPlaybackService.setPosition(song.id, positionMs);
+        setMidiCurrentTime(bar.startTime);
+        setCurrentBar(barId);
+      }
+    } catch (error) {
+      console.error("Error seeking MIDI:", error);
+    }
+  };
+
+  const handleMidiDownload = async () => {
+    try {
+      if (!musicData?.audioFile) {
+        Alert.alert("Error", "No audio file available for download.");
+        return;
+      }
+
+      await MidiPlaybackService.downloadMidiForUser(
+        musicData.audioFile,
+        song.name
+      );
+    } catch (error) {
+      console.error("Error downloading MIDI:", error);
+      Alert.alert("Error", "Failed to download MIDI file. Please try again.");
+    }
+  };
+
+  const testMidiDownload = async () => {
+    try {
+      console.log("Testing MIDI download functionality...");
+      const result = await MidiPlaybackService.testMidiDownload();
+      Alert.alert("Test Result", result);
+    } catch (error) {
+      console.error("Test error:", error);
+      Alert.alert("Test Failed", error.message);
+    }
+  };
+
+  const upgradeToPremiumForTesting = async () => {
+    try {
+      console.log("Upgrading to Premium for testing...");
+      const success = await SubscriptionService.setSubscriptionTierForTesting();
+      if (success) {
+        Alert.alert(
+          "Success",
+          "Temporarily upgraded to Premium for testing. Try downloading MIDI now!"
+        );
+      } else {
+        Alert.alert("Error", "Failed to upgrade subscription for testing");
+      }
+    } catch (error) {
+      console.error("Upgrade error:", error);
+      Alert.alert("Error", error.message);
+    }
+  };
+
   const handleRatingChange = async (rating, songTitle) => {
     setUserRating(rating);
 
@@ -322,6 +542,36 @@ export default function MusicAnalysisScreen({ route, navigation }) {
     );
   };
 
+  const renderMidiProgressBar = () => {
+    const progress = midiDuration > 0 ? midiCurrentTime / midiDuration : 0;
+    return (
+      <View style={styles.progressContainer}>
+        <View style={styles.progressTrack}>
+          <View
+            style={[
+              styles.progressFill,
+              {
+                width: `${progress * 100}%`,
+                backgroundColor: isMidiPlaying
+                  ? Colors.purple
+                  : Colors.lightGreen,
+              },
+            ]}
+          />
+        </View>
+        <View style={styles.timeLabels}>
+          <Text style={styles.timeText}>{formatTime(midiCurrentTime)}</Text>
+          <Text style={styles.timeText}>{formatTime(midiDuration)}</Text>
+        </View>
+        <View style={styles.midiProgressInfo}>
+          <Text style={styles.midiProgressText}>
+            {isMidiPlaying ? "🎵 Playing" : "⏸️ Paused"} • MIDI Backing Track
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
   const renderBar = (bar, index) => {
     const isActive = currentBar === bar.id;
 
@@ -336,7 +586,13 @@ export default function MusicAnalysisScreen({ route, navigation }) {
         ]}
       >
         <TouchableOpacity
-          onPress={() => handleSeek(bar.id)}
+          onPress={() => {
+            if (midiLoaded && isMidiPlaying) {
+              handleMidiSeek(bar.id);
+            } else {
+              handleSeek(bar.id);
+            }
+          }}
           activeOpacity={0.8}
           style={styles.barContent}
         >
@@ -344,7 +600,9 @@ export default function MusicAnalysisScreen({ route, navigation }) {
           <View style={styles.barHeader}>
             <View style={styles.barInfo}>
               <Text style={styles.barNumber}>
-                {proficiencyConfig?.showBasicNotation ? `Measure ${bar.id + 1}` : `Bar ${bar.id + 1}`}
+                {proficiencyConfig?.showBasicNotation
+                  ? `Measure ${bar.id + 1}`
+                  : `Bar ${bar.id + 1}`}
               </Text>
               {proficiencyConfig?.showComplexAnalysis && bar.theory && (
                 <Text style={styles.theoryText}>
@@ -360,7 +618,12 @@ export default function MusicAnalysisScreen({ route, navigation }) {
                 {bar.chord}
               </Text>
               {proficiencyConfig?.showComplexAnalysis && bar.theory && (
-                <View style={[styles.tensionIndicator, { backgroundColor: getTensionColor(bar.theory.tension) }]}>
+                <View
+                  style={[
+                    styles.tensionIndicator,
+                    { backgroundColor: getTensionColor(bar.theory.tension) },
+                  ]}
+                >
                   <Text style={styles.tensionText}>{bar.theory.tension}</Text>
                 </View>
               )}
@@ -480,15 +743,25 @@ export default function MusicAnalysisScreen({ route, navigation }) {
             Music Analysis
           </Text>
           {proficiencyConfig && (
-            <View style={[styles.proficiencyBadge, { borderColor: proficiencyConfig.color }]}>
-              <Text style={[styles.proficiencyText, { color: proficiencyConfig.color }]}>
+            <View
+              style={[
+                styles.proficiencyBadge,
+                { borderColor: proficiencyConfig.color },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.proficiencyText,
+                  { color: proficiencyConfig.color },
+                ]}
+              >
                 {proficiencyConfig.label}
               </Text>
             </View>
           )}
           <TouchableOpacity
             style={styles.headerButton}
-            onPress={() => Alert.alert("Download", "Download MIDI file")}
+            onPress={handleMidiDownload}
           >
             <Ionicons
               name="download-outline"
@@ -516,32 +789,115 @@ export default function MusicAnalysisScreen({ route, navigation }) {
           style={[styles.playerCard, GlassStyles.glassCard]}
         >
           <TouchableOpacity
-            style={styles.playButton}
-            onPress={handlePlayPause}
+            style={[styles.playButton, midiLoading && styles.loadingButton]}
+            onPress={handleMidiPlayPause}
             activeOpacity={0.8}
+            disabled={midiLoading}
           >
             <LinearGradient
-              colors={[Colors.lightGreen, "#059669"]}
+              colors={
+                midiError
+                  ? [Colors.red, "#dc2626"]
+                  : midiLoading
+                  ? [Colors.gray, "#6b7280"]
+                  : isMidiPlaying
+                  ? [Colors.purple, "#7c3aed"]
+                  : [Colors.lightGreen, "#059669"]
+              }
               style={styles.playButtonGradient}
             >
-              <Ionicons
-                name={isPlaying ? "pause" : "play"}
-                size={24}
-                color={Colors.white}
-              />
+              {midiLoading ? (
+                <Ionicons name="hourglass" size={24} color={Colors.white} />
+              ) : midiError ? (
+                <Ionicons name="alert-circle" size={24} color={Colors.white} />
+              ) : (
+                <Ionicons
+                  name={isMidiPlaying ? "pause" : "play"}
+                  size={24}
+                  color={Colors.white}
+                />
+              )}
             </LinearGradient>
           </TouchableOpacity>
 
           <View style={styles.playerInfo}>
-            <Text style={styles.playerTitle}>MIDI Playback</Text>
-            <Text style={styles.playerSubtitle}>
-              {musicData?.midiFile?.name} • {musicData?.midiFile?.size}
+            <Text style={styles.playerTitle}>
+              {midiError
+                ? "MIDI Error"
+                : midiLoading
+                ? "Loading MIDI..."
+                : "MIDI Guide Track"}
             </Text>
+            <Text style={styles.playerSubtitle}>
+              {midiError
+                ? midiError
+                : musicData?.audioFile
+                ? `${musicData.audioFile.name} • ${
+                    musicData.audioFile.size
+                  } • ${musicData.audioFile.format || "M4A"}`
+                : "No audio file available"}
+            </Text>
+            {midiLoaded && !midiError && (
+              <Text
+                style={[
+                  styles.playerTracks,
+                  {
+                    color: musicData?.audioFile
+                      ? Colors.lightGreen
+                      : Colors.orange,
+                    fontSize: 12,
+                  },
+                ]}
+              >
+                {musicData?.audioFile
+                  ? "🎵 YouTube audio backing track"
+                  : "⚠️ No audio file available"}
+              </Text>
+            )}
+            {midiLoaded && musicData?.audioFile && (
+              <Text style={styles.playerTracks}>
+                Source:{" "}
+                {musicData.audioFile.youtube_source?.title || "YouTube Audio"}
+              </Text>
+            )}
           </View>
+
+          {midiLoaded && !midiError && (
+            <TouchableOpacity
+              style={styles.reloadButton}
+              onPress={loadMidiFile}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="refresh" size={20} color={Colors.lightGreen} />
+            </TouchableOpacity>
+          )}
+
+          {/* Debug Test Button */}
+          <TouchableOpacity
+            style={[styles.reloadButton, { marginLeft: 8 }]}
+            onPress={testMidiDownload}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="bug" size={20} color={Colors.orange} />
+          </TouchableOpacity>
+
+          {/* Premium Upgrade Button (Development Only) */}
+          <TouchableOpacity
+            style={[
+              styles.reloadButton,
+              { marginLeft: 8, backgroundColor: Colors.orange },
+            ]}
+            onPress={upgradeToPremiumForTesting}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="star" size={20} color={Colors.white} />
+          </TouchableOpacity>
         </BlurView>
 
-        {/* Progress Bar */}
-        {renderProgressBar()}
+        {/* Progress Bar - Show MIDI progress when available */}
+        {midiLoaded && midiDuration > 0
+          ? renderMidiProgressBar()
+          : renderProgressBar()}
 
         {/* Bars with Chords and Lyrics */}
         <ScrollView
@@ -609,20 +965,20 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.3)",
   },
   proficiencyBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: 45,
-    left: '50%',
+    left: "50%",
     transform: [{ translateX: -40 }],
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 10,
     borderWidth: 1,
-    backgroundColor: Colors.black + '60',
+    backgroundColor: Colors.black + "60",
   },
   proficiencyText: {
     fontSize: 10,
-    fontWeight: '600',
-    textTransform: 'uppercase',
+    fontWeight: "600",
+    textTransform: "uppercase",
   },
   loadingContainer: {
     flex: 1,
@@ -833,35 +1189,35 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: Colors.gray,
     marginLeft: 8,
-    fontStyle: 'italic',
+    fontStyle: "italic",
   },
   tensionIndicator: {
-    position: 'absolute',
+    position: "absolute",
     top: -4,
     right: -4,
     paddingHorizontal: 4,
     paddingVertical: 2,
     borderRadius: 6,
     minWidth: 20,
-    alignItems: 'center',
+    alignItems: "center",
   },
   tensionText: {
     fontSize: 8,
     color: Colors.white,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
+    fontWeight: "bold",
+    textTransform: "uppercase",
   },
   timingContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.black + '20',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    backgroundColor: Colors.black + "20",
     borderRadius: 8,
     padding: 8,
     marginBottom: 8,
   },
   timingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
   },
   timingText: {
@@ -870,5 +1226,36 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 20,
+  },
+  // MIDI-related styles
+  loadingButton: {
+    opacity: 0.6,
+  },
+  playerTracks: {
+    fontSize: 10,
+    color: Colors.lightGray,
+    opacity: 0.8,
+    marginTop: 2,
+  },
+  reloadButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(16, 185, 129, 0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(16, 185, 129, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 8,
+  },
+  midiProgressInfo: {
+    marginTop: 8,
+    alignItems: "center",
+  },
+  midiProgressText: {
+    fontSize: 12,
+    color: Colors.lightGray,
+    opacity: 0.8,
+    textAlign: "center",
   },
 });

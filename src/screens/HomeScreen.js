@@ -90,7 +90,7 @@ if (Platform.OS === "web") {
 const { width, height } = Dimensions.get("window");
 
 export default function HomeScreen({ navigation }) {
-  const { user, signOut } = useAuth();
+  const { user, signOut, getValidAccessToken } = useAuth();
   const [recording, setRecording] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -111,7 +111,7 @@ export default function HomeScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchInput, setShowSearchInput] = useState(false);
-  
+
   // Retry mechanism state
   const [retryCount, setRetryCount] = useState(0);
   const [lastAudioData, setLastAudioData] = useState(null);
@@ -429,15 +429,28 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  const handleSongIdentification = async (audioData, isBase64 = false, isRetry = false) => {
+  const handleSongIdentification = async (
+    audioData,
+    isBase64 = false,
+    isRetry = false
+  ) => {
     try {
+      // Check if user is authenticated
+      if (!getValidAccessToken) {
+        Alert.alert(
+          "Authentication Required",
+          "Please sign in to identify songs."
+        );
+        return;
+      }
+
       let sessionId = identificationSessionId;
-      
+
       // If this is a new identification (not a retry), start a new session
       if (!isRetry) {
         // Reset retry count for new identification
         setRetryCount(0);
-        
+
         // Check subscription limits before starting recording (only for new attempts)
         const canIdentify = await SubscriptionService.canIdentifySongs();
         // Uncomment this when subscription limits are enforced
@@ -446,35 +459,44 @@ export default function HomeScreen({ navigation }) {
         //   setShowUpgradeModal(true);
         //   return;
         // }
-        
+
         // Start new identification session
         sessionId = await IdentificationRetryService.startIdentificationSession(
-          user.id, 
-          audioData, 
+          user.id,
+          audioData,
           isBase64
         );
         setIdentificationSessionId(sessionId);
         setLastAudioData(audioData);
         setLastIsBase64(isBase64);
-        
+
         // Increment usage count only for new attempts (not retries)
         await SubscriptionService.incrementDailyUsage();
       }
 
-      // Pass retry flag to identifySong function
-      const results = await identifySong(audioData, isBase64, isRetry);
-      
+      // Pass both authentication function and retry flag to identifySong function
+      const results = await identifySong(
+        audioData,
+        isBase64,
+        getValidAccessToken,
+        isRetry
+      );
+
       // Record this attempt in the retry service
       const sessionData = await IdentificationRetryService.recordAttempt(
-        sessionId, 
-        results, 
+        sessionId,
+        results,
         isRetry
       );
 
       if (results && results.length > 0) {
         // Success - end the session
-        await IdentificationRetryService.endSession(sessionId, 'success', results[0]);
-        
+        await IdentificationRetryService.endSession(
+          sessionId,
+          "success",
+          results[0]
+        );
+
         // Automatically navigate to music analysis with the first (best) result
         const bestResult = results[0]; // Take the first result (usually highest confidence)
 
@@ -492,7 +514,7 @@ export default function HomeScreen({ navigation }) {
 
         // Refresh subscription status to update UI
         await loadSubscriptionStatus();
-        
+
         // Clear retry state
         setRetryCount(0);
         setIdentificationSessionId(null);
@@ -505,10 +527,10 @@ export default function HomeScreen({ navigation }) {
           setShowNoSongFoundModal(true);
         } else {
           // Max retries reached - end session as failed
-          await IdentificationRetryService.endSession(sessionId, 'failed');
+          await IdentificationRetryService.endSession(sessionId, "failed");
           setRetryCount(sessionData.attemptsMade);
           setShowNoSongFoundModal(true);
-          
+
           // Clear retry state
           setIdentificationSessionId(null);
           setLastAudioData(null);
@@ -517,17 +539,41 @@ export default function HomeScreen({ navigation }) {
       }
     } catch (error) {
       console.error("Song identification error:", error);
-      
-      // Record failed attempt if we have a session
-      if (identificationSessionId) {
-        try {
-          await IdentificationRetryService.recordAttempt(identificationSessionId, [], isRetry);
-        } catch (retryError) {
-          console.error("Failed to record retry attempt:", retryError);
+
+      // Handle authentication errors specifically
+      if (
+        error.message.includes("Authentication") ||
+        error.message.includes("sign in")
+      ) {
+        Alert.alert(
+          "Authentication Required",
+          "Your session has expired. Please sign in again.",
+          [
+            {
+              text: "OK",
+              onPress: () => signOut(), // Force sign out to show login screen
+            },
+          ]
+        );
+      } else {
+        // Record failed attempt if we have a session
+        if (identificationSessionId) {
+          try {
+            await IdentificationRetryService.recordAttempt(
+              identificationSessionId,
+              [],
+              isRetry
+            );
+          } catch (retryError) {
+            console.error("Failed to record retry attempt:", retryError);
+          }
         }
+
+        Alert.alert(
+          "Error",
+          error.message || "Failed to identify song. Please try again."
+        );
       }
-      
-      Alert.alert("Error", "Failed to identify song. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -554,7 +600,7 @@ export default function HomeScreen({ navigation }) {
 
   const handleNoSongTryAgain = async () => {
     setShowNoSongFoundModal(false);
-    
+
     if (lastAudioData && identificationSessionId) {
       // Use stored audio data for retry
       setIsProcessing(true);
@@ -571,15 +617,18 @@ export default function HomeScreen({ navigation }) {
 
   const handleNoSongGotIt = async () => {
     setShowNoSongFoundModal(false);
-    
+
     // End the session as abandoned if we have one active
     if (identificationSessionId) {
-      await IdentificationRetryService.endSession(identificationSessionId, 'abandoned');
+      await IdentificationRetryService.endSession(
+        identificationSessionId,
+        "abandoned"
+      );
       setIdentificationSessionId(null);
       setLastAudioData(null);
       setLastIsBase64(false);
     }
-    
+
     setRetryCount(0);
   };
 
@@ -597,17 +646,44 @@ export default function HomeScreen({ navigation }) {
         return;
       }
 
+      // Check if song has audio data
+      const audioFile = song.analysisData?.audioFile;
+      if (!audioFile?.downloadUrl) {
+        Alert.alert("Error", "No audio file available for this song.");
+        return;
+      }
+
       // If user can download, proceed with download
-      Alert.alert("Download MIDI", `Download MIDI file for "${song.name}"?`, [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Download",
-          onPress: () => {
-            // Mock download - replace with actual download logic
-            Alert.alert("Success", "MIDI file downloaded successfully!");
+      Alert.alert(
+        "Download Audio",
+        `Download backing track for "${song.name}"?\n\nFile: ${
+          audioFile.name
+        }\nSize: ${audioFile.size}\nFormat: ${audioFile.format || "m4a"}`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Download",
+            onPress: async () => {
+              try {
+                // Import MidiPlaybackService dynamically to avoid import issues
+                const { MidiPlaybackService } = await import(
+                  "../services/MidiPlaybackService"
+                );
+                await MidiPlaybackService.downloadMidiForUser(
+                  audioFile,
+                  song.name
+                );
+              } catch (error) {
+                console.error("Error downloading MIDI file:", error);
+                Alert.alert(
+                  "Error",
+                  "Failed to download MIDI file. Please try again."
+                );
+              }
+            },
           },
-        },
-      ]);
+        ]
+      );
     } catch (error) {
       console.error("Error checking MIDI download permission:", error);
       Alert.alert("Error", "Unable to download MIDI file. Please try again.");
@@ -622,9 +698,9 @@ export default function HomeScreen({ navigation }) {
     try {
       setIsSearching(true);
       setIsProcessing(true);
-      
+
       const results = await searchSongs(searchQuery.trim());
-      
+
       if (results && results.length > 0) {
         setSongResults(results);
         setShowResults(true);
@@ -794,7 +870,12 @@ export default function HomeScreen({ navigation }) {
             )}
 
             {showSearchInput && (
-              <View style={[styles.searchInputContainer, GlassStyles.glassContainer]}>
+              <View
+                style={[
+                  styles.searchInputContainer,
+                  GlassStyles.glassContainer,
+                ]}
+              >
                 <TextInput
                   style={styles.searchInput}
                   value={searchQuery}
@@ -813,9 +894,16 @@ export default function HomeScreen({ navigation }) {
                     activeOpacity={0.8}
                   >
                     {isSearching ? (
-                      <ActivityIndicator size="small" color={Colors.lightGreen} />
+                      <ActivityIndicator
+                        size="small"
+                        color={Colors.lightGreen}
+                      />
                     ) : (
-                      <Ionicons name="search" size={20} color={Colors.lightGreen} />
+                      <Ionicons
+                        name="search"
+                        size={20}
+                        color={Colors.lightGreen}
+                      />
                     )}
                     <Text style={styles.searchButtonText}>Search</Text>
                   </TouchableOpacity>

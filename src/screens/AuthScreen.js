@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   View,
   Text,
@@ -6,17 +6,17 @@ import {
   StyleSheet,
   Dimensions,
   Alert,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 
-import { useAuth } from '../context/AuthContext';
-import { Colors } from '../styles/Colors';
-import { GlassStyles } from '../styles/GlassStyles';
+import { useAuth } from "../context/AuthContext";
+import { Colors } from "../styles/Colors";
+import { GlassStyles } from "../styles/GlassStyles";
 
-const { width, height } = Dimensions.get('window');
+const { width, height } = Dimensions.get("window");
 
 export default function AuthScreen() {
   const { signInWithGoogle, signInWithApple } = useAuth();
@@ -25,23 +25,32 @@ export default function AuthScreen() {
     try {
       const result = await signInWithGoogle();
       if (!result.success) {
-        Alert.alert('Error', 'Failed to sign in with Google');
+        Alert.alert("Error", "Failed to sign in with Google");
       }
     } catch (error) {
-      console.error('Google sign in error:', error);
-      Alert.alert('Error', 'Failed to sign in with Google');
+      console.error("Google sign in error:", error);
+      Alert.alert("Error", "Failed to sign in with Google");
     }
   };
 
   const handleAppleSignIn = async () => {
     try {
+      console.log("Apple Sign-In button pressed");
       const result = await signInWithApple();
+      console.log("Apple Sign-In result:", result);
+
       if (!result.success) {
-        Alert.alert('Error', 'Failed to sign in with Apple');
+        Alert.alert(
+          "Authentication Failed",
+          result.error || "Failed to sign in with Apple"
+        );
       }
     } catch (error) {
-      console.error('Apple sign in error:', error);
-      Alert.alert('Error', 'Failed to sign in with Apple');
+      console.error("Apple sign in error:", error);
+      Alert.alert(
+        "Authentication Error",
+        error.message || "Failed to sign in with Apple"
+      );
     }
   };
 
@@ -62,7 +71,11 @@ export default function AuthScreen() {
           {/* Logo and Title */}
           <View style={styles.header}>
             <View style={[styles.logoContainer, GlassStyles.glowingBorder]}>
-              <Ionicons name="musical-notes" size={60} color={Colors.lightGreen} />
+              <Ionicons
+                name="musical-notes"
+                size={60}
+                color={Colors.lightGreen}
+              />
             </View>
             <Text style={styles.title}>Songbook</Text>
             <Text style={styles.subtitle}>
@@ -72,7 +85,10 @@ export default function AuthScreen() {
 
           {/* Authentication Options */}
           <View style={styles.authContainer}>
-            <BlurView intensity={20} style={[styles.authCard, GlassStyles.glassContainer]}>
+            <BlurView
+              intensity={20}
+              style={[styles.authCard, GlassStyles.glassContainer]}
+            >
               <Text style={styles.authTitle}>Get Started</Text>
               <Text style={styles.authSubtitle}>
                 Sign in to save your music discoveries
@@ -101,7 +117,8 @@ export default function AuthScreen() {
           {/* Footer */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>
-              By continuing, you agree to our Terms of Service and Privacy Policy
+              By continuing, you agree to our Terms of Service and Privacy
+              Policy
             </Text>
           </View>
         </View>
@@ -118,12 +135,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   backgroundElements: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
+    position: "absolute",
+    width: "100%",
+    height: "100%",
   },
   floatingElement: {
-    position: 'absolute',
+    position: "absolute",
     borderRadius: 100,
     opacity: 0.1,
   },
@@ -151,10 +168,10 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 24,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
   },
   header: {
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: height * 0.15,
   },
   logoContainer: {
@@ -162,17 +179,17 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
     backgroundColor: Colors.glass,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 24,
     borderWidth: 2,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderColor: "rgba(16, 185, 129, 0.3)",
   },
   title: {
     fontSize: 48,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: Colors.white,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 8,
     textShadowColor: Colors.purple,
     textShadowOffset: { width: 0, height: 2 },
@@ -181,12 +198,12 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 18,
     color: Colors.lightGray,
-    textAlign: 'center',
+    textAlign: "center",
     opacity: 0.8,
   },
   authContainer: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     marginTop: 40,
   },
   authCard: {
@@ -195,22 +212,22 @@ const styles = StyleSheet.create({
   },
   authTitle: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: Colors.white,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 8,
   },
   authSubtitle: {
     fontSize: 16,
     color: Colors.lightGray,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 32,
     opacity: 0.8,
   },
   authButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 12,
@@ -218,17 +235,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   googleButton: {
-    backgroundColor: 'rgba(219, 68, 55, 0.2)',
-    borderColor: 'rgba(219, 68, 55, 0.3)',
+    backgroundColor: "rgba(219, 68, 55, 0.2)",
+    borderColor: "rgba(219, 68, 55, 0.3)",
   },
   appleButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    borderColor: "rgba(255, 255, 255, 0.2)",
   },
   authButtonText: {
     color: Colors.white,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     marginLeft: 12,
   },
   footer: {
@@ -238,7 +255,7 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 12,
     color: Colors.gray,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 16,
   },
 });
