@@ -13,7 +13,7 @@ if (Platform.OS !== "web") {
   };
 }
 
-const API_BASE_URL = "http://localhost:5001";
+const API_BASE_URL = "http://localhost:3000";
 const RETRY_STORAGE_KEY = "identification_retry_sessions";
 const MAX_RETRIES = 2; // Allow 2 retry attempts (3 total attempts)
 

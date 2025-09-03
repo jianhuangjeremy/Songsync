@@ -23,7 +23,7 @@ import {
   UserPreferencesService,
   PROFICIENCY_CONFIG,
 } from "../services/UserPreferencesService";
-import { MidiPlaybackService } from "../services/MidiPlaybackService";
+import { AudioPlaybackService } from "../services/AudioPlaybackService";
 import { SubscriptionService } from "../services/SubscriptionService";
 
 const { width } = Dimensions.get("window");
@@ -83,19 +83,22 @@ const generateFallbackData = (song, config) => {
   }
 
   return {
-    midiFile: {
-      id: song.id || "1",
-      name: `${song.name} - Backing Track`,
+    audioFile: {
+      id: `audio_${song.id || "1"}`,
+      name: `${song.name} - Audio Backing Track`,
       filename: `${
-        song.name?.replace(/[^a-z0-9]/gi, "_") || "song"
-      }_backing_track.mid`,
-      size: "45 KB",
-      downloadUrl: `http://localhost:5001/static/midi/${
-        song.name?.replace(/[^a-z0-9]/gi, "_") || "fallback"
-      }_backing_track.mid`,
-      tempo_bpm: 120,
-      num_measures: numBars,
-      tracks: ["drums", "bass", "piano"],
+        song.singerName?.replace(/[<>:"/\\|?*]/g, "_") || "Artist"
+      }_${
+        song.name?.replace(/[<>:"/\\|?*]/g, "_") || "fallback"
+      }_backing_track.m4a`,
+      size: "5.8 MB",
+      downloadUrl: `/static/audio/${encodeURIComponent(
+        (song.singerName?.replace(/[<>:"/\\|?*]/g, "_") || "Artist") +
+        "_" +
+        (song.name?.replace(/[<>:"/\\|?*]/g, "_") || "fallback") +
+        "_backing_track.m4a"
+      )}`,
+      format: "m4a",
     },
     bars,
     sections: config?.showComplexAnalysis
@@ -182,24 +185,15 @@ export default function MusicAnalysisScreen({ route, navigation }) {
   const { song } = route.params;
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(233); // 3:53 in seconds
   const [currentBar, setCurrentBar] = useState(0);
   const [loading, setLoading] = useState(true);
   const [musicData, setMusicData] = useState(null);
   const [userRating, setUserRating] = useState(0);
   const [proficiencyConfig, setProficiencyConfig] = useState(null);
-
-  // MIDI playback state
-  const [isMidiPlaying, setIsMidiPlaying] = useState(false);
-  const [midiLoading, setMidiLoading] = useState(false);
-  const [midiLoaded, setMidiLoaded] = useState(false);
-  const [midiCurrentTime, setMidiCurrentTime] = useState(0);
-  const [midiDuration, setMidiDuration] = useState(0);
-  const [midiError, setMidiError] = useState(null);
+  const [audioError, setAudioError] = useState(null);
 
   const progressAnimation = useRef(new Animated.Value(0)).current;
   const playbackInterval = useRef(null);
-  const midiStatusInterval = useRef(null);
   const scrollViewRef = useRef(null);
 
   useEffect(() => {
@@ -229,11 +223,8 @@ export default function MusicAnalysisScreen({ route, navigation }) {
       if (playbackInterval.current) {
         clearInterval(playbackInterval.current);
       }
-      if (midiStatusInterval.current) {
-        clearInterval(midiStatusInterval.current);
-      }
-      // Cleanup MIDI player when component unmounts
-      MidiPlaybackService.cleanupMidiPlayer(song.id);
+      // Cleanup audio player when component unmounts
+      AudioPlaybackService.cleanupAudioPlayer(song.id);
     };
   }, []);
 
@@ -277,59 +268,92 @@ export default function MusicAnalysisScreen({ route, navigation }) {
     }
   };
 
-  const handlePlayPause = () => {
-    if (isPlaying) {
-      // Pause
-      setIsPlaying(false);
-      if (playbackInterval.current) {
-        clearInterval(playbackInterval.current);
-        playbackInterval.current = null;
-      }
-    } else {
-      // Play
-      setIsPlaying(true);
-      playbackInterval.current = setInterval(() => {
-        setCurrentTime((prevTime) => {
-          const newTime = prevTime + 0.1;
-          if (newTime >= duration) {
-            setIsPlaying(false);
-            clearInterval(playbackInterval.current);
-            playbackInterval.current = null;
-            setCurrentTime(0);
-            setCurrentBar(0);
-            return 0;
-          }
-
-          // Update current bar based on time
-          if (musicData) {
-            const bar = musicData.bars.find(
-              (bar) => newTime >= bar.startTime && newTime < bar.endTime
-            );
-            if (bar && bar.id !== currentBar) {
-              setCurrentBar(bar.id);
-              // Auto-scroll to current bar
-              setTimeout(() => {
-                scrollViewRef.current?.scrollTo({
-                  y: bar.id * 120, // Approximate height per bar
-                  animated: true,
-                });
-              }, 100);
+  const handlePlayPause = async () => {
+    try {
+      if (isPlaying) {
+        // Pause audio
+        await AudioPlaybackService.pauseAudio(song.id);
+        setIsPlaying(false);
+        if (playbackInterval.current) {
+          clearInterval(playbackInterval.current);
+          playbackInterval.current = null;
+        }
+      } else {
+        // Start loading/playing audio
+        setAudioLoading(true);
+        
+        // Get audio file from music data
+        const audioFile = musicData?.audioFile;
+        if (!audioFile || !audioFile.downloadUrl) {
+          throw new Error('No audio file available for this song');
+        }
+        
+        // Check if audio is already loaded
+        const existingPlayer = AudioPlaybackService.audioPlayers.get(song.id);
+        if (!existingPlayer) {
+          console.log('Loading audio file for playback...');
+          
+          // Download/prepare the audio file
+          const audioPath = await AudioPlaybackService.downloadAudioFile(audioFile, song.id);
+          console.log('Audio downloaded to:', audioPath);
+          
+          // Load the audio for playback
+          await AudioPlaybackService.loadAudioFile(audioPath, song.id);
+          console.log('Audio loaded successfully');
+        }
+        
+        // Play the audio
+        await AudioPlaybackService.playAudio(song.id);
+        setIsPlaying(true);
+        setAudioLoading(false);
+        
+        // Start visual playback tracking
+        playbackInterval.current = setInterval(() => {
+          setCurrentTime((prevTime) => {
+            const newTime = prevTime + 0.1;
+            if (newTime >= duration) {
+              setIsPlaying(false);
+              clearInterval(playbackInterval.current);
+              playbackInterval.current = null;
+              setCurrentTime(0);
+              setCurrentBar(0);
+              return 0;
             }
-          }
 
-          return newTime;
-        });
-      }, 100);
+            // Update current bar based on time
+            if (musicData) {
+              const bar = musicData.bars.find(
+                (bar) => newTime >= bar.startTime && newTime < bar.endTime
+              );
+              if (bar && bar.id !== currentBar) {
+                setCurrentBar(bar.id);
+                // Auto-scroll to current bar
+                setTimeout(() => {
+                  scrollViewRef.current?.scrollTo({
+                    y: bar.id * 120, // Approximate height per bar
+                    animated: true,
+                  });
+                }, 100);
+              }
+            }
+
+            return newTime;
+          });
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Audio playback error:', error);
+      setAudioLoading(false);
+      setIsPlaying(false);
+      Alert.alert('Audio Error', `Failed to play audio: ${error.message}`);
     }
   };
 
   const handleSeek = (barId) => {
-    if (musicData) {
-      const bar = musicData.bars[barId];
-      if (bar) {
-        setCurrentTime(bar.startTime);
-        setCurrentBar(barId);
-      }
+    const bar = musicData?.bars?.[barId];
+    if (bar) {
+      setCurrentTime(bar.startTime);
+      setCurrentBar(barId);
     }
   };
 
@@ -339,133 +363,24 @@ export default function MusicAnalysisScreen({ route, navigation }) {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // Audio playback functions
-  const loadMidiFile = async () => {
-    try {
-      if (!musicData?.audioFile?.downloadUrl) {
-        setMidiError("No audio file available");
-        return;
-      }
 
-      setMidiLoading(true);
-      setMidiError(null);
-
-      console.log("Loading audio file:", musicData.audioFile.downloadUrl);
-
-      // Download and load audio file
-      const localPath = await MidiPlaybackService.downloadMidiFile(
-        musicData.audioFile,
-        song.id
-      );
-
-      await MidiPlaybackService.loadMidiFile(localPath, song.id);
-
-      // Set up status update callback
-      MidiPlaybackService.setPlaybackStatusUpdate(song.id, (status) => {
-        setIsMidiPlaying(status.isPlaying);
-        setMidiCurrentTime(status.positionMillis / 1000);
-        setMidiDuration(status.durationMillis / 1000);
-
-        // Update chord progression based on MIDI playback time
-        if (status.isPlaying && musicData) {
-          const currentSeconds = status.positionMillis / 1000;
-          const bar = musicData.bars.find(
-            (bar) =>
-              currentSeconds >= bar.startTime && currentSeconds < bar.endTime
-          );
-          if (bar && bar.id !== currentBar) {
-            setCurrentBar(bar.id);
-            // Auto-scroll to current bar
-            setTimeout(() => {
-              scrollViewRef.current?.scrollTo({
-                y: bar.id * 120,
-                animated: true,
-              });
-            }, 100);
-          }
-        }
-      });
-
-      setMidiLoaded(true);
-      setMidiLoading(false);
-      console.log("MIDI file loaded successfully");
-    } catch (error) {
-      console.error("Error loading MIDI file:", error);
-      setMidiError(error.message);
-      setMidiLoading(false);
-
-      if (error.message.includes("Premium subscription required")) {
-        Alert.alert(
-          "Premium Required",
-          "MIDI playback requires a Premium subscription. Upgrade to unlock backing tracks and enhanced features.",
-          [{ text: "OK" }]
-        );
-      } else {
-        Alert.alert("Error", "Failed to load MIDI file. Please try again.");
-      }
-    }
-  };
-
-  const handleMidiPlayPause = async () => {
-    try {
-      if (!midiLoaded) {
-        await loadMidiFile();
-        return;
-      }
-
-      if (isMidiPlaying) {
-        await MidiPlaybackService.pauseMidi(song.id);
-        setIsMidiPlaying(false);
-      } else {
-        await MidiPlaybackService.playMidi(song.id);
-        setIsMidiPlaying(true);
-      }
-    } catch (error) {
-      console.error("Error controlling MIDI playback:", error);
-      Alert.alert(
-        "Error",
-        "Failed to control MIDI playback. Please try again."
-      );
-    }
-  };
-
-  const handleMidiSeek = async (barId) => {
-    try {
-      if (!midiLoaded || !musicData) return;
-
-      const bar = musicData.bars[barId];
-      if (bar) {
-        const positionMs = bar.startTime * 1000;
-        await MidiPlaybackService.setPosition(song.id, positionMs);
-        setMidiCurrentTime(bar.startTime);
-        setCurrentBar(barId);
-      }
-    } catch (error) {
-      console.error("Error seeking MIDI:", error);
-    }
-  };
-
-  const handleMidiDownload = async () => {
+  const handleAudioDownload = async () => {
     try {
       if (!musicData?.audioFile) {
         Alert.alert("Error", "No audio file available for download.");
         return;
       }
-
-      await MidiPlaybackService.downloadMidiForUser(
-        musicData.audioFile,
-        song.name
-      );
+      await AudioPlaybackService.downloadAudioForUser(musicData.audioFile, song.name);
     } catch (error) {
-      console.error("Error downloading MIDI:", error);
-      Alert.alert("Error", "Failed to download MIDI file. Please try again.");
+      console.error("Error downloading audio:", error);
+      Alert.alert("Error", "Failed to download audio file. Please try again.");
     }
   };
 
-  const testMidiDownload = async () => {
+  const testAudioDownload = async () => {
     try {
-      console.log("Testing MIDI download functionality...");
-      const result = await MidiPlaybackService.testMidiDownload();
+      console.log("Testing audio download functionality...");
+      const result = await AudioPlaybackService.testAudioDownload();
       Alert.alert("Test Result", result);
     } catch (error) {
       console.error("Test error:", error);
@@ -480,7 +395,7 @@ export default function MusicAnalysisScreen({ route, navigation }) {
       if (success) {
         Alert.alert(
           "Success",
-          "Temporarily upgraded to Premium for testing. Try downloading MIDI now!"
+          "Temporarily upgraded to Premium for testing. Try downloading audio now!"
         );
       } else {
         Alert.alert("Error", "Failed to upgrade subscription for testing");
@@ -526,47 +441,16 @@ export default function MusicAnalysisScreen({ route, navigation }) {
   };
 
   const renderProgressBar = () => {
-    const progress = currentTime / duration;
+    const maxTime = 233;
+    const progress = currentTime / maxTime;
     return (
       <View style={styles.progressContainer}>
         <View style={styles.progressTrack}>
-          <View
-            style={[styles.progressFill, { width: `${progress * 100}%` }]}
-          />
+          <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
         </View>
         <View style={styles.timeLabels}>
           <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
-          <Text style={styles.timeText}>{formatTime(duration)}</Text>
-        </View>
-      </View>
-    );
-  };
-
-  const renderMidiProgressBar = () => {
-    const progress = midiDuration > 0 ? midiCurrentTime / midiDuration : 0;
-    return (
-      <View style={styles.progressContainer}>
-        <View style={styles.progressTrack}>
-          <View
-            style={[
-              styles.progressFill,
-              {
-                width: `${progress * 100}%`,
-                backgroundColor: isMidiPlaying
-                  ? Colors.purple
-                  : Colors.lightGreen,
-              },
-            ]}
-          />
-        </View>
-        <View style={styles.timeLabels}>
-          <Text style={styles.timeText}>{formatTime(midiCurrentTime)}</Text>
-          <Text style={styles.timeText}>{formatTime(midiDuration)}</Text>
-        </View>
-        <View style={styles.midiProgressInfo}>
-          <Text style={styles.midiProgressText}>
-            {isMidiPlaying ? "🎵 Playing" : "⏸️ Paused"} • MIDI Backing Track
-          </Text>
+          <Text style={styles.timeText}>{formatTime(maxTime)}</Text>
         </View>
       </View>
     );
@@ -761,7 +645,7 @@ export default function MusicAnalysisScreen({ route, navigation }) {
           )}
           <TouchableOpacity
             style={styles.headerButton}
-            onPress={handleMidiDownload}
+            onPress={handleAudioDownload}
           >
             <Ionicons
               name="download-outline"
@@ -789,115 +673,39 @@ export default function MusicAnalysisScreen({ route, navigation }) {
           style={[styles.playerCard, GlassStyles.glassCard]}
         >
           <TouchableOpacity
-            style={[styles.playButton, midiLoading && styles.loadingButton]}
-            onPress={handleMidiPlayPause}
+            style={styles.playButton}
+            onPress={handlePlayPause}
             activeOpacity={0.8}
-            disabled={midiLoading}
           >
             <LinearGradient
-              colors={
-                midiError
-                  ? [Colors.red, "#dc2626"]
-                  : midiLoading
-                  ? [Colors.gray, "#6b7280"]
-                  : isMidiPlaying
-                  ? [Colors.purple, "#7c3aed"]
-                  : [Colors.lightGreen, "#059669"]
-              }
+              colors={audioError ? [Colors.red, "#dc2626"] : [Colors.lightGreen, "#059669"]}
               style={styles.playButtonGradient}
             >
-              {midiLoading ? (
-                <Ionicons name="hourglass" size={24} color={Colors.white} />
-              ) : midiError ? (
-                <Ionicons name="alert-circle" size={24} color={Colors.white} />
-              ) : (
-                <Ionicons
-                  name={isMidiPlaying ? "pause" : "play"}
-                  size={24}
-                  color={Colors.white}
-                />
-              )}
+              <Ionicons
+                name={audioError ? "alert-circle" : (isPlaying ? "pause" : "play")}
+                size={24}
+                color={Colors.white}
+              />
             </LinearGradient>
           </TouchableOpacity>
 
           <View style={styles.playerInfo}>
             <Text style={styles.playerTitle}>
-              {midiError
-                ? "MIDI Error"
-                : midiLoading
-                ? "Loading MIDI..."
-                : "MIDI Guide Track"}
+              {audioError ? "Audio Error" : "Audio Guide Track"}
             </Text>
             <Text style={styles.playerSubtitle}>
-              {midiError
-                ? midiError
+              {audioError
+                ? audioError
                 : musicData?.audioFile
-                ? `${musicData.audioFile.name} • ${
-                    musicData.audioFile.size
-                  } • ${musicData.audioFile.format || "M4A"}`
+                ? `${musicData.audioFile.name} • ${musicData.audioFile.size} • ${musicData.audioFile.format || "M4A"}`
                 : "No audio file available"}
             </Text>
-            {midiLoaded && !midiError && (
-              <Text
-                style={[
-                  styles.playerTracks,
-                  {
-                    color: musicData?.audioFile
-                      ? Colors.lightGreen
-                      : Colors.orange,
-                    fontSize: 12,
-                  },
-                ]}
-              >
-                {musicData?.audioFile
-                  ? "🎵 YouTube audio backing track"
-                  : "⚠️ No audio file available"}
-              </Text>
-            )}
-            {midiLoaded && musicData?.audioFile && (
-              <Text style={styles.playerTracks}>
-                Source:{" "}
-                {musicData.audioFile.youtube_source?.title || "YouTube Audio"}
-              </Text>
-            )}
           </View>
 
-          {midiLoaded && !midiError && (
-            <TouchableOpacity
-              style={styles.reloadButton}
-              onPress={loadMidiFile}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="refresh" size={20} color={Colors.lightGreen} />
-            </TouchableOpacity>
-          )}
-
-          {/* Debug Test Button */}
-          <TouchableOpacity
-            style={[styles.reloadButton, { marginLeft: 8 }]}
-            onPress={testMidiDownload}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="bug" size={20} color={Colors.orange} />
-          </TouchableOpacity>
-
-          {/* Premium Upgrade Button (Development Only) */}
-          <TouchableOpacity
-            style={[
-              styles.reloadButton,
-              { marginLeft: 8, backgroundColor: Colors.orange },
-            ]}
-            onPress={upgradeToPremiumForTesting}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="star" size={20} color={Colors.white} />
-          </TouchableOpacity>
         </BlurView>
 
-        {/* Progress Bar - Show MIDI progress when available */}
-        {midiLoaded && midiDuration > 0
-          ? renderMidiProgressBar()
-          : renderProgressBar()}
+        {/* Progress Bar */}
+        {renderProgressBar()}
 
         {/* Bars with Chords and Lyrics */}
         <ScrollView
@@ -1226,36 +1034,5 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 20,
-  },
-  // MIDI-related styles
-  loadingButton: {
-    opacity: 0.6,
-  },
-  playerTracks: {
-    fontSize: 10,
-    color: Colors.lightGray,
-    opacity: 0.8,
-    marginTop: 2,
-  },
-  reloadButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(16, 185, 129, 0.2)",
-    borderWidth: 1,
-    borderColor: "rgba(16, 185, 129, 0.3)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 8,
-  },
-  midiProgressInfo: {
-    marginTop: 8,
-    alignItems: "center",
-  },
-  midiProgressText: {
-    fontSize: 12,
-    color: Colors.lightGray,
-    opacity: 0.8,
-    textAlign: "center",
   },
 });

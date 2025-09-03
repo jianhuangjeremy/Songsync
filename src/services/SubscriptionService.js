@@ -65,11 +65,71 @@ export const SUBSCRIPTION_CONFIG = {
 const SUBSCRIPTION_KEY = "user_subscription_tier";
 const USAGE_KEY_PREFIX = "daily_usage_";
 const SUBSCRIPTION_START_DATE_KEY = "subscription_start_date";
+const DEVELOPMENT_MODE_KEY = "development_mode_enabled";
+
+// Development configuration
+const DEVELOPMENT_EMAILS = [
+  "jianhuang@example.com", // Add your development email here
+  "jianhuang@gmail.com",
+  "jianhuang@songbook.com",
+  "developer@songbook.com",
+  "test@songbook.com",
+  "admin@songbook.com"
+];
+
+const DEVELOPMENT_USER_IDS = [
+  "jianhuang", // Add your development user IDs here
+  "dev_user_123",
+  "test_user_456"
+];
 
 export class SubscriptionService {
   // Get current date string for usage tracking
   static getCurrentDateString() {
     return new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
+  }
+
+  // Check if current user is a development user
+  static isDevelopmentUser(userEmail, userId) {
+    const isDevelopmentBuild = __DEV__ || process.env.NODE_ENV === "development";
+    const isDevEmail = userEmail && DEVELOPMENT_EMAILS.includes(userEmail.toLowerCase());
+    const isDevUserId = userId && DEVELOPMENT_USER_IDS.includes(userId);
+    
+    return isDevelopmentBuild || isDevEmail || isDevUserId;
+  }
+
+  // Enable/disable development mode manually (for testing payment flow)
+  static async setDevelopmentMode(enabled) {
+    try {
+      await SecureStore.setItemAsync(DEVELOPMENT_MODE_KEY, enabled.toString());
+      console.log(`🔧 Development mode ${enabled ? 'enabled' : 'disabled'}`);
+    } catch (error) {
+      console.error("Error setting development mode:", error);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(DEVELOPMENT_MODE_KEY, enabled.toString());
+      }
+    }
+  }
+
+  // Check if development mode is manually enabled
+  static async isDevelopmentModeEnabled() {
+    try {
+      const enabled = await SecureStore.getItemAsync(DEVELOPMENT_MODE_KEY);
+      return enabled === "true";
+    } catch (error) {
+      if (typeof window !== "undefined") {
+        return localStorage.getItem(DEVELOPMENT_MODE_KEY) === "true";
+      }
+      return false;
+    }
+  }
+
+  // Check if user should bypass subscription limits
+  static async shouldBypassLimits(userEmail = null, userId = null) {
+    const isDevUser = this.isDevelopmentUser(userEmail, userId);
+    const isDevModeEnabled = await this.isDevelopmentModeEnabled();
+    
+    return isDevUser || isDevModeEnabled;
   }
 
   // Save user subscription tier
@@ -196,7 +256,19 @@ export class SubscriptionService {
   }
 
   // Check if user can identify songs
-  static async canIdentifySongs() {
+  static async canIdentifySongs(userEmail = null, userId = null) {
+    // Check if user should bypass limits (development mode)
+    const shouldBypass = await this.shouldBypassLimits(userEmail, userId);
+    if (shouldBypass) {
+      return { 
+        canUse: true, 
+        remaining: -1, 
+        used: 0,
+        limit: -1,
+        isDevelopmentMode: true 
+      };
+    }
+
     const tier = await this.getSubscriptionTier();
     const config = this.getSubscriptionConfig(tier);
 
@@ -217,18 +289,37 @@ export class SubscriptionService {
   }
 
   // Check if user can download MIDI files
-  static async canDownloadMidi() {
+  static async canDownloadMidi(userEmail = null, userId = null) {
+    // Check if user should bypass limits (development mode)
+    const shouldBypass = await this.shouldBypassLimits(userEmail, userId);
+    if (shouldBypass) {
+      return {
+        canDownload: true,
+        tier: "development",
+        requiresUpgrade: false,
+        isDevelopmentMode: true
+      };
+    }
+
     const tier = await this.getSubscriptionTier();
     const config = this.getSubscriptionConfig(tier);
 
-    // TEMPORARY: Allow MIDI downloads for development/testing
-    // Remove this in production
-    const isDevelopment = __DEV__ || process.env.NODE_ENV === "development";
-
     return {
-      canDownload: config.canDownloadMidi || isDevelopment,
+      canDownload: config.canDownloadMidi,
       tier: tier,
-      requiresUpgrade: !config.canDownloadMidi && !isDevelopment,
+      requiresUpgrade: !config.canDownloadMidi,
+    };
+  }
+
+  // FOR TESTING ONLY: Force trigger subscription modal (even for dev users)
+  static async triggerTestSubscriptionFlow() {
+    console.log("🧪 Test Mode: Triggering subscription flow for testing");
+    return {
+      canUse: false,
+      remaining: 0,
+      used: 3,
+      limit: 3,
+      isTestMode: true
     };
   }
 

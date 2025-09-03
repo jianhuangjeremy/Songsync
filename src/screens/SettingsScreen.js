@@ -24,6 +24,7 @@ import {
   PROFICIENCY_LEVELS,
   PROFICIENCY_CONFIG,
 } from '../services/UserPreferencesService';
+import { SubscriptionService } from '../services/SubscriptionService';
 
 const { width } = Dimensions.get('window');
 
@@ -33,12 +34,15 @@ export default function SettingsScreen({ navigation }) {
   const [sliderValue, setSliderValue] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDevelopmentMode, setIsDevelopmentMode] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState(null);
 
   const fadeAnimation = useRef(new Animated.Value(0)).current;
   const slideAnimation = useRef(new Animated.Value(50)).current;
 
   useEffect(() => {
     loadUserPreferences();
+    loadDevelopmentSettings();
     
     // Entrance animation
     Animated.parallel([
@@ -68,6 +72,18 @@ export default function SettingsScreen({ navigation }) {
       console.error('Error loading preferences:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadDevelopmentSettings = async () => {
+    try {
+      const devMode = await SubscriptionService.isDevelopmentModeEnabled();
+      setIsDevelopmentMode(devMode);
+      
+      const status = await SubscriptionService.getSubscriptionStatus();
+      setSubscriptionStatus(status);
+    } catch (error) {
+      console.error('Error loading development settings:', error);
     }
   };
 
@@ -103,6 +119,63 @@ export default function SettingsScreen({ navigation }) {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleDevelopmentModeToggle = async () => {
+    try {
+      const newMode = !isDevelopmentMode;
+      await SubscriptionService.setDevelopmentMode(newMode);
+      setIsDevelopmentMode(newMode);
+      
+      Alert.alert(
+        'Development Mode',
+        newMode 
+          ? '🔧 Development mode enabled! Subscription limits are bypassed.' 
+          : '🔒 Development mode disabled. Subscription limits are now enforced.',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      Alert.alert('Error', 'Failed to toggle development mode');
+    }
+  };
+
+  const handleTestPaymentFlow = async () => {
+    Alert.alert(
+      'Test Payment Flow',
+      'This will trigger the subscription modal for testing purposes.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Test Payment', 
+          onPress: () => {
+            // Navigate back to HomeScreen and trigger test mode
+            navigation.navigate('Home', { testPaymentFlow: true });
+          }
+        },
+      ]
+    );
+  };
+
+  const handleResetUsage = async () => {
+    Alert.alert(
+      'Reset Daily Usage',
+      'This will reset your daily identification count to 0.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Reset', 
+          onPress: async () => {
+            try {
+              await SubscriptionService.resetDailyUsage();
+              await loadDevelopmentSettings();
+              Alert.alert('Success', 'Daily usage has been reset');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to reset usage');
+            }
+          }
+        },
+      ]
+    );
   };
 
   const handleSignOut = () => {
@@ -347,6 +420,73 @@ export default function SettingsScreen({ navigation }) {
                         </>
                       )}
                     </LinearGradient>
+                  </TouchableOpacity>
+                </LinearGradient>
+              </BlurView>
+            </View>
+
+            {/* Development Settings Section */}
+            <View style={styles.section}>
+              <BlurView intensity={Platform.OS === 'ios' ? 100 : 80} style={styles.sectionBlur}>
+                <LinearGradient
+                  colors={[
+                    Colors.black + '40',
+                    Colors.red + '20',
+                    Colors.black + '40',
+                  ]}
+                  style={styles.sectionGradient}
+                >
+                  <View style={styles.sectionHeader}>
+                    <Ionicons name="code" size={24} color={Colors.red} />
+                    <Text style={styles.sectionTitle}>Development Settings</Text>
+                  </View>
+
+                  {/* Development Mode Toggle */}
+                  <TouchableOpacity style={styles.settingItem} onPress={handleDevelopmentModeToggle}>
+                    <View style={styles.settingContent}>
+                      <Ionicons 
+                        name={isDevelopmentMode ? "toggle" : "toggle-outline"} 
+                        size={20} 
+                        color={isDevelopmentMode ? Colors.lightGreen : Colors.gray} 
+                      />
+                      <Text style={styles.settingText}>
+                        Development Mode {isDevelopmentMode ? "(ON)" : "(OFF)"}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={Colors.gray} />
+                  </TouchableOpacity>
+
+                  {/* Current Status Display */}
+                  {subscriptionStatus && (
+                    <View style={[styles.settingItem, { opacity: 0.7 }]}>
+                      <View style={styles.settingContent}>
+                        <Ionicons name="information-circle" size={20} color={Colors.blue} />
+                        <Text style={styles.settingText}>
+                          Usage: {subscriptionStatus.usage}/{subscriptionStatus.identificationStatus.limit === -1 ? '∞' : subscriptionStatus.identificationStatus.limit}
+                        </Text>
+                      </View>
+                      <Text style={[styles.settingText, { fontSize: 12, color: Colors.gray }]}>
+                        {subscriptionStatus.config.name}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Test Payment Flow */}
+                  <TouchableOpacity style={styles.settingItem} onPress={handleTestPaymentFlow}>
+                    <View style={styles.settingContent}>
+                      <Ionicons name="card" size={20} color={Colors.orange} />
+                      <Text style={styles.settingText}>Test Payment Flow</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={Colors.gray} />
+                  </TouchableOpacity>
+
+                  {/* Reset Usage */}
+                  <TouchableOpacity style={styles.settingItem} onPress={handleResetUsage}>
+                    <View style={styles.settingContent}>
+                      <Ionicons name="refresh" size={20} color={Colors.purple} />
+                      <Text style={styles.settingText}>Reset Daily Usage</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={Colors.gray} />
                   </TouchableOpacity>
                 </LinearGradient>
               </BlurView>
