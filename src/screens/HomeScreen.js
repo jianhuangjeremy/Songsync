@@ -10,10 +10,8 @@ import {
   Animated,
   ActivityIndicator,
   Platform,
-  Image,
   ScrollView,
   TextInput,
-  Keyboard,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -32,7 +30,7 @@ import { SubscriptionService } from "../services/SubscriptionService";
 import { IdentificationRetryService } from "../services/IdentificationRetryService";
 import SongResultModal from "../components/SongResultModal";
 import NoSongFoundModal from "../components/NoSongFoundModal";
-import UpgradeModal from "../components/UpgradeModal";
+import SubscriptionModal from "../components/SubscriptionModal";
 import { Colors } from "../styles/Colors";
 import { GlassStyles } from "../styles/GlassStyles";
 
@@ -43,53 +41,21 @@ if (Platform.OS !== "web") {
   FileSystem = require("expo-file-system");
 }
 
-// Add custom CSS for better scroll bar on web
+// Simple web scrollbar styling
 if (Platform.OS === "web") {
   const style = document.createElement("style");
   style.textContent = `
-    /* Custom scrollbar for webkit browsers */
-    *::-webkit-scrollbar {
-      width: 12px !important;
-      background: rgba(0, 0, 0, 0.3) !important;
-    }
-    
-    *::-webkit-scrollbar-track {
-      background: rgba(0, 0, 0, 0.3) !important;
-      border-radius: 6px !important;
-      border: 1px solid rgba(16, 185, 129, 0.3) !important;
-    }
-    
-    *::-webkit-scrollbar-thumb {
-      background: linear-gradient(180deg, #10B981 0%, #059669 100%) !important;
-      border-radius: 6px !important;
-      border: 1px solid rgba(16, 185, 129, 0.5) !important;
-      box-shadow: 0 0 10px rgba(16, 185, 129, 0.3) !important;
-      transition: all 0.3s ease !important;
-    }
-    
-    *::-webkit-scrollbar-thumb:hover {
-      background: linear-gradient(180deg, #059669 0%, #047857 100%) !important;
-      box-shadow: 0 0 15px rgba(16, 185, 129, 0.5) !important;
-      transform: scale(1.1) !important;
-    }
-    
-    /* Firefox scrollbar */
-    * {
-      scrollbar-width: thick !important;
-      scrollbar-color: #10B981 rgba(0, 0, 0, 0.3) !important;
-    }
-    
-    /* Force scroll bar to always be visible */
-    html, body, #root, #root > div {
-      overflow-y: scroll !important;
-    }
+    * { scrollbar-width: thin; scrollbar-color: #10B981 rgba(0,0,0,0.3); }
+    *::-webkit-scrollbar { width: 8px; }
+    *::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); }
+    *::-webkit-scrollbar-thumb { background: #10B981; border-radius: 4px; }
   `;
   document.head.appendChild(style);
 }
 
 const { width, height } = Dimensions.get("window");
 
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen({ navigation, route }) {
   const { user, signOut, getValidAccessToken } = useAuth();
   const [recording, setRecording] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -97,19 +63,14 @@ export default function HomeScreen({ navigation }) {
   const [songResults, setSongResults] = useState([]);
   const [showResults, setShowResults] = useState(false);
   const [showNoSongFoundModal, setShowNoSongFoundModal] = useState(false);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [upgradeReason, setUpgradeReason] = useState("limit_reached");
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState(null);
   const [recentResults, setRecentResults] = useState([]);
-  const [scrollProgress, setScrollProgress] = useState(0);
-  const [contentHeight, setContentHeight] = useState(0);
-  const [containerHeight, setContainerHeight] = useState(0);
   const scrollViewRef = useRef(null);
   const recordingTimeoutRef = useRef(null);
   const [recordingCountdown, setRecordingCountdown] = useState(0);
   const countdownIntervalRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
   const [showSearchInput, setShowSearchInput] = useState(false);
 
   // Retry mechanism state
@@ -157,13 +118,20 @@ export default function HomeScreen({ navigation }) {
       try {
         await loadRecentResults();
         await loadSubscriptionStatus();
+        
+        // Check if we should trigger test payment flow
+        if (route?.params?.testPaymentFlow) {
+          setTimeout(() => {
+            setShowSubscriptionModal(true);
+          }, 1000); // Show modal after a slight delay
+        }
       } catch (error) {
         console.error("Error initializing component:", error);
       }
     };
 
     initializeComponent();
-  }, []);
+  }, [route?.params?.testPaymentFlow]);
 
   useEffect(() => {
     if (isRecording) {
@@ -278,12 +246,11 @@ export default function HomeScreen({ navigation }) {
   const startRecording = async () => {
     try {
       // Check subscription limits before starting recording
-      const canIdentify = await SubscriptionService.canIdentifySongs();
-      // if (!canIdentify.canUse) {
-      //   setUpgradeReason("limit_reached");
-      //   setShowUpgradeModal(true);
-      //   return;
-      // }
+      const canIdentify = await SubscriptionService.canIdentifySongs(user?.email, user?.id);
+      if (!canIdentify.canUse) {
+        setShowSubscriptionModal(true);
+        return;
+      }
 
       const hasPermission = await requestPermissions();
       if (!hasPermission) return;
@@ -452,13 +419,11 @@ export default function HomeScreen({ navigation }) {
         setRetryCount(0);
 
         // Check subscription limits before starting recording (only for new attempts)
-        const canIdentify = await SubscriptionService.canIdentifySongs();
-        // Uncomment this when subscription limits are enforced
-        // if (!canIdentify.canUse) {
-        //   setUpgradeReason("limit_reached");
-        //   setShowUpgradeModal(true);
-        //   return;
-        // }
+        const canIdentify = await SubscriptionService.canIdentifySongs(user?.email, user?.id);
+        if (!canIdentify.canUse) {
+          setShowSubscriptionModal(true);
+          return;
+        }
 
         // Start new identification session
         sessionId = await IdentificationRetryService.startIdentificationSession(
@@ -638,11 +603,10 @@ export default function HomeScreen({ navigation }) {
 
   const handleMidiDownload = async (song) => {
     try {
-      const midiStatus = await SubscriptionService.canDownloadMidi();
+      const midiStatus = await SubscriptionService.canDownloadMidi(user?.email, user?.id);
 
       if (!midiStatus.canDownload) {
-        setUpgradeReason("midi_download");
-        setShowUpgradeModal(true);
+        setShowSubscriptionModal(true);
         return;
       }
 
@@ -665,11 +629,11 @@ export default function HomeScreen({ navigation }) {
             text: "Download",
             onPress: async () => {
               try {
-                // Import MidiPlaybackService dynamically to avoid import issues
-                const { MidiPlaybackService } = await import(
-                  "../services/MidiPlaybackService"
+                // Import AudioPlaybackService dynamically to avoid import issues
+                const { AudioPlaybackService } = await import(
+                  "../services/AudioPlaybackService"
                 );
-                await MidiPlaybackService.downloadMidiForUser(
+                await AudioPlaybackService.downloadAudioForUser(
                   audioFile,
                   song.name
                 );
@@ -691,17 +655,13 @@ export default function HomeScreen({ navigation }) {
   };
 
   const handleSearchSong = async () => {
-    if (!searchQuery || searchQuery.trim().length === 0) {
-      return;
-    }
+    if (!searchQuery?.trim()) return;
 
     try {
-      setIsSearching(true);
       setIsProcessing(true);
-
       const results = await searchSongs(searchQuery.trim());
-
-      if (results && results.length > 0) {
+      
+      if (results?.length > 0) {
         setSongResults(results);
         setShowResults(true);
       } else {
@@ -711,30 +671,15 @@ export default function HomeScreen({ navigation }) {
       console.error("Search error:", error);
       Alert.alert("Error", "Failed to search songs. Please try again.");
     } finally {
-      setIsSearching(false);
       setIsProcessing(false);
     }
   };
 
   const toggleSearchInput = () => {
     setShowSearchInput(!showSearchInput);
-    if (showSearchInput) {
-      setSearchQuery("");
-      Keyboard.dismiss();
-    }
+    if (showSearchInput) setSearchQuery("");
   };
 
-  const handleScroll = (event) => {
-    const offsetY = event.nativeEvent.contentOffset.y;
-    const contentSizeHeight = event.nativeEvent.contentSize.height;
-    const layoutMeasurementHeight = event.nativeEvent.layoutMeasurement.height;
-
-    // Calculate scroll progress (0 to 1)
-    const progress = offsetY / (contentSizeHeight - layoutMeasurementHeight);
-    setScrollProgress(Math.max(0, Math.min(1, progress)));
-    setContentHeight(contentSizeHeight);
-    setContainerHeight(layoutMeasurementHeight);
-  };
 
   const handleRecordPress = () => {
     if (isRecording) {
@@ -825,13 +770,7 @@ export default function HomeScreen({ navigation }) {
           ref={scrollViewRef}
           style={styles.mainContent}
           contentContainerStyle={styles.mainContentContainer}
-          showsVerticalScrollIndicator={true}
-          indicatorStyle="white" // Make scroll indicator white for better visibility
-          bounces={true}
-          alwaysBounceVertical={true}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
-          persistentScrollbar={true} // Keep scroll bar visible on web
+          showsVerticalScrollIndicator={false}
         >
           {/* Status Text */}
           <View style={styles.statusContainer}>
@@ -1080,29 +1019,6 @@ export default function HomeScreen({ navigation }) {
           )}
         </ScrollView>
 
-        {/* Custom Scroll Bar */}
-        {contentHeight > containerHeight && (
-          <View style={styles.customScrollBar}>
-            <View style={styles.scrollTrack}>
-              <View
-                style={[
-                  styles.scrollThumb,
-                  {
-                    height: `${Math.max(
-                      10,
-                      (containerHeight / contentHeight) * 100
-                    )}%`,
-                    top: `${
-                      scrollProgress *
-                      (100 -
-                        Math.max(10, (containerHeight / contentHeight) * 100))
-                    }%`,
-                  },
-                ]}
-              />
-            </View>
-          </View>
-        )}
 
         {/* Song Results Modal */}
         <SongResultModal
@@ -1126,16 +1042,14 @@ export default function HomeScreen({ navigation }) {
           canRetry={retryCount < 2}
         />
 
-        {/* Upgrade Modal */}
-        <UpgradeModal
-          visible={showUpgradeModal}
-          onClose={() => setShowUpgradeModal(false)}
-          onUpgrade={async (newTier) => {
-            setShowUpgradeModal(false);
+        {/* Subscription Modal */}
+        <SubscriptionModal
+          visible={showSubscriptionModal}
+          onClose={() => setShowSubscriptionModal(false)}
+          onSuccess={async (tier) => {
+            setShowSubscriptionModal(false);
             await loadSubscriptionStatus();
           }}
-          currentTier={subscriptionStatus?.tier}
-          reason={upgradeReason}
         />
       </SafeAreaView>
     </LinearGradient>
@@ -1205,11 +1119,6 @@ const styles = StyleSheet.create({
   mainContent: {
     flex: 1,
     paddingHorizontal: 20,
-    ...(Platform.OS === "web" && {
-      // Custom scroll bar styling for web
-      scrollbarWidth: "thin",
-      scrollbarColor: `${Colors.lightGreen} rgba(255, 255, 255, 0.1)`,
-    }),
   },
   mainContentContainer: {
     flexGrow: 1,
@@ -1396,39 +1305,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(16, 185, 129, 0.3)",
     justifyContent: "center",
     alignItems: "center",
-  },
-  customScrollBar: {
-    position: "absolute",
-    right: 5,
-    top: 100,
-    bottom: 100,
-    width: 20,
-    zIndex: 100,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  scrollTrack: {
-    width: 12,
-    height: "100%",
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "rgba(16, 185, 129, 0.3)",
-    position: "relative",
-  },
-  scrollThumb: {
-    position: "absolute",
-    width: "100%",
-    backgroundColor: Colors.lightGreen,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "rgba(16, 185, 129, 0.5)",
-    shadowColor: Colors.lightGreen,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 8,
-    elevation: 5,
-    minHeight: 30,
   },
   usageIndicator: {
     position: "absolute",

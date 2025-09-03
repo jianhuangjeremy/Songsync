@@ -22,14 +22,14 @@ import {
   SUBSCRIPTION_TIERS,
   SUBSCRIPTION_CONFIG,
 } from '../services/SubscriptionService';
-import UpgradeModal from '../components/UpgradeModal';
+import SubscriptionModal from '../components/SubscriptionModal';
 
 const { width } = Dimensions.get('window');
 
 export default function SubscriptionScreen({ navigation }) {
   const [subscriptionStatus, setSubscriptionStatus] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [selectedUpgradeTier, setSelectedUpgradeTier] = useState(null);
 
   const fadeAnimation = useRef(new Animated.Value(0)).current;
@@ -79,18 +79,12 @@ export default function SubscriptionScreen({ navigation }) {
 
   const handleUpgrade = (targetTier) => {
     setSelectedUpgradeTier(targetTier);
-    setShowUpgradeModal(true);
+    setShowSubscriptionModal(true);
   };
 
   const handleUpgradeComplete = async (newTier) => {
-    setShowUpgradeModal(false);
+    setShowSubscriptionModal(false);
     await loadSubscriptionStatus();
-    
-    Alert.alert(
-      'Subscription Updated!',
-      'Your subscription has been successfully updated. Enjoy your new features!',
-      [{ text: 'OK', style: 'default' }]
-    );
   };
 
   const handleCancelSubscription = () => {
@@ -373,13 +367,11 @@ export default function SubscriptionScreen({ navigation }) {
         </SafeAreaView>
       </LinearGradient>
 
-      {/* Upgrade Modal */}
-      <UpgradeModal
-        visible={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-        onUpgrade={handleUpgradeComplete}
-        currentTier={subscriptionStatus?.tier}
-        reason="feature_access"
+      {/* Subscription Modal */}
+      <SubscriptionModal
+        visible={showSubscriptionModal}
+        onClose={() => setShowSubscriptionModal(false)}
+        onSuccess={handleUpgradeComplete}
       />
     </>
   );

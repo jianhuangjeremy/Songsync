@@ -41,7 +41,7 @@ const MOCK_SONGS = [
         filename: "pharrell_williams_happy_backing_track.m4a",
         size: "8.5 MB",
         downloadUrl:
-          "http://localhost:5001/static/audio/pharrell_williams_happy_backing_track.m4a",
+          "http://localhost:3000/static/audio/pharrell_williams_happy_backing_track.m4a",
         format: "m4a",
         duration_seconds: 233,
         youtube_source: {
@@ -151,7 +151,7 @@ const MOCK_SONGS = [
         filename: "queen_bohemian_rhapsody_backing_track.m4a",
         size: "12.8 MB",
         downloadUrl:
-          "http://localhost:5001/static/audio/queen_bohemian_rhapsody_backing_track.m4a",
+          "http://localhost:3000/static/audio/queen_bohemian_rhapsody_backing_track.m4a",
         format: "m4a",
         duration_seconds: 355,
         youtube_source: {
@@ -204,7 +204,7 @@ const MOCK_SONGS = [
         filename: "ed_sheeran_shape_of_you_backing_track.m4a",
         size: "6.2 MB",
         downloadUrl:
-          "http://localhost:5001/static/audio/ed_sheeran_shape_of_you_backing_track.m4a",
+          "http://localhost:3000/static/audio/ed_sheeran_shape_of_you_backing_track.m4a",
         format: "m4a",
         duration_seconds: 233,
         youtube_source: {
@@ -447,7 +447,7 @@ export const getLibrary = async (userId) => {
                   song.name?.replace(/[^a-z0-9]/gi, "_") || "song"
                 }_backing_track.m4a`,
                 size: "6.5 MB",
-                downloadUrl: `http://localhost:5001/static/audio/${
+                downloadUrl: `http://localhost:3000/static/audio/${
                   song.name?.replace(/[^a-z0-9]/gi, "_") || "fallback"
                 }_backing_track.m4a`,
                 format: "m4a",
@@ -611,7 +611,7 @@ export const initializeDemoLibrary = async (userId) => {
                   song.name?.replace(/[^a-z0-9]/gi, "_") || "song"
                 }_backing_track.m4a`,
                 size: "6.5 MB",
-                downloadUrl: `http://localhost:5001/static/audio/${
+                downloadUrl: `http://localhost:3000/static/audio/${
                   song.name?.replace(/[^a-z0-9]/gi, "_") || "fallback"
                 }_backing_track.m4a`,
                 format: "m4a",
