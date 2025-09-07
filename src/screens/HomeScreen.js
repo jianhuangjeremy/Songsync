@@ -439,11 +439,13 @@ export default function HomeScreen({ navigation, route }) {
         await SubscriptionService.incrementDailyUsage();
       }
 
-      // Pass both authentication function and retry flag to identifySong function
+      // Pass authentication function, user info, and retry flag to identifySong function
       const results = await identifySong(
         audioData,
         isBase64,
         getValidAccessToken,
+        user?.id || user?.email || 'anonymous',
+        user?.email,
         isRetry
       );
 
@@ -504,6 +506,15 @@ export default function HomeScreen({ navigation, route }) {
       }
     } catch (error) {
       console.error("Song identification error:", error);
+
+      // Handle quota exceeded errors - show subscription modal
+      if (error.requiresUpgrade || error.quotaInfo) {
+        console.log("Quota exceeded, showing subscription modal:", error.quotaInfo);
+        setShowSubscriptionModal(true);
+        
+        // Don't show additional error alert for quota issues
+        return;
+      }
 
       // Handle authentication errors specifically
       if (

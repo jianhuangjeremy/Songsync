@@ -15,6 +15,7 @@ if (Platform.OS !== "web") {
 }
 
 const API_BASE_URL = "http://localhost:3000"; // Node.js auth service
+const BACKEND_API_URL = "http://localhost:5001"; // Python backend service
 
 // Mock song database with complete analysis data (your backend will return this format)
 const MOCK_SONGS = [
@@ -238,11 +239,125 @@ const MOCK_SONGS = [
 ];
 
 /**
- * Identifies a song from audio and returns complete analysis data
+ * Check user quota before making identification request
+ * @param {string} userId - User ID for quota tracking
+ * @param {string} userEmail - User email (optional)
+ * @returns {Promise<Object>} Quota status information
+ */
+export const checkUserQuota = async (userId, userEmail = null) => {
+  try {
+    const url = new URL(`${BACKEND_API_URL}/quota/check`);
+    url.searchParams.append('userId', userId);
+    if (userEmail) {
+      url.searchParams.append('userEmail', userEmail);
+    }
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      return result.quota;
+    } else {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(errorData.error || 'Failed to check quota');
+    }
+  } catch (error) {
+    console.error('Quota check error:', error);
+    // Return permissive quota on error to not block users
+    return {
+      can_identify: true,
+      remaining: 3,
+      used_today: 0,
+      daily_limit: 3,
+      tier: 'free',
+      is_development: false
+    };
+  }
+};
+
+/**
+ * Get user subscription status
+ * @param {string} userId - User ID
+ * @param {string} userEmail - User email (optional)
+ * @returns {Promise<Object>} Subscription status information
+ */
+export const getUserSubscriptionStatus = async (userId, userEmail = null) => {
+  try {
+    const url = new URL(`${BACKEND_API_URL}/subscription/status`);
+    url.searchParams.append('userId', userId);
+    if (userEmail) {
+      url.searchParams.append('userEmail', userEmail);
+    }
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      return result.status;
+    } else {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(errorData.error || 'Failed to get subscription status');
+    }
+  } catch (error) {
+    console.error('Subscription status error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update user subscription tier after successful payment
+ * @param {string} userId - User ID
+ * @param {string} tier - New subscription tier ('free', 'basic', 'premium')
+ * @param {Object} receiptData - IAP receipt data
+ * @param {string} userEmail - User email (optional)
+ * @returns {Promise<Object>} Update result
+ */
+export const updateUserSubscription = async (userId, tier, receiptData = null, userEmail = null) => {
+  try {
+    const response = await fetch(`${BACKEND_API_URL}/subscription/update`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId,
+        tier,
+        receiptData,
+        userEmail
+      }),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      return result;
+    } else {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(errorData.error || 'Failed to update subscription');
+    }
+  } catch (error) {
+    console.error('Subscription update error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Identifies a song from audio and returns complete analysis data with quota enforcement
  * This is the main function that your backend should implement
  * @param {string} audioData - URI of the audio file or base64 audio data
  * @param {boolean} isBase64 - Whether audioData is base64 encoded audio
  * @param {function} getValidAccessToken - Function to get valid access token
+ * @param {string} userId - User ID for quota tracking
+ * @param {string} userEmail - User email (optional)
  * @param {boolean} isRetryAttempt - Whether this is a retry attempt (don't deduct usage)
  * @returns {Promise<Array>} Array of song objects with complete analysis data
  */
@@ -250,10 +365,23 @@ export const identifySong = async (
   audioData,
   isBase64 = false,
   getValidAccessToken,
+  userId,
+  userEmail = null,
   isRetryAttempt = false
 ) => {
   try {
-    // Get valid access token for authentication
+    // Check quota before processing (unless it's a retry)
+    if (!isRetryAttempt) {
+      const quotaStatus = await checkUserQuota(userId, userEmail);
+      if (!quotaStatus.can_identify) {
+        const quotaError = new Error(`Daily quota exceeded. You've used ${quotaStatus.used_today} of ${quotaStatus.daily_limit} identifications today.`);
+        quotaError.quotaInfo = quotaStatus;
+        quotaError.requiresUpgrade = true;
+        throw quotaError;
+      }
+    }
+
+    // Get valid access token for authentication  
     if (!getValidAccessToken) {
       throw new Error("Authentication required. Please sign in again.");
     }
@@ -263,13 +391,15 @@ export const identifySong = async (
     let requestBody;
 
     if (isBase64) {
-      // Handle base64 audio data
+      // Handle base64 audio data with quota info
       console.log(
         "Sending base64 audio data to backend, length:",
         audioData.length
       );
       requestBody = JSON.stringify({
-        audioData: audioData,
+        audioFile: audioData,
+        userId: userId,
+        userEmail: userEmail,
         format: "base64",
         timestamp: Date.now(),
       });
@@ -286,21 +416,23 @@ export const identifySong = async (
 
       requestBody = JSON.stringify({
         audioFile: audioData,
+        userId: userId,
+        userEmail: userEmail,
         timestamp: Date.now(),
       });
     }
 
-    // Send authenticated request to Node.js service (which proxies to Python)
+    // Send request directly to Python backend with quota tracking
     try {
       console.log("requestBody is ", JSON.stringify(requestBody));
       console.log("isRetryAttempt:", isRetryAttempt);
 
-      const response = await fetch(`${API_BASE_URL}/identify-and-analyze`, {
+      const response = await fetch(`${BACKEND_API_URL}/identify-and-analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-          "X-Retry-Attempt": isRetryAttempt ? "true" : "false", // Tell backend this is a retry
+          // Note: We're calling the backend directly now, so no JWT needed
+          "X-Retry-Attempt": isRetryAttempt ? "true" : "false",
         },
         body: requestBody,
       });
@@ -333,6 +465,13 @@ export const identifySong = async (
         }));
 
         return processedResults;
+      } else if (response.status === 429) {
+        // Handle quota exceeded
+        const errorData = await response.json().catch(() => ({ error: "Quota exceeded" }));
+        const quotaError = new Error(errorData.message || "Daily quota exceeded");
+        quotaError.quotaInfo = errorData.quotaInfo;
+        quotaError.requiresUpgrade = errorData.upgradeRequired || true;
+        throw quotaError;
       } else if (response.status === 401) {
         throw new Error("Authentication failed. Please sign in again.");
       } else if (response.status === 403) {

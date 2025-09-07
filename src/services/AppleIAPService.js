@@ -236,18 +236,38 @@ export class AppleIAPService {
       await SubscriptionService.saveSubscriptionTier(tier);
 
       // Store purchase receipt for validation
-      await SecureStore.setItemAsync(
-        'iap_purchase_receipt', 
-        JSON.stringify({
-          productId: purchase.productId,
-          transactionId: purchase.transactionId,
-          purchaseTime: purchase.purchaseTime,
-          tier: tier,
-        })
-      );
+      const receiptData = {
+        productId: purchase.productId,
+        transactionId: purchase.transactionId,
+        purchaseTime: purchase.purchaseTime,
+        tier: tier,
+      };
+      
+      await SecureStore.setItemAsync('iap_purchase_receipt', JSON.stringify(receiptData));
+
+      // Update subscription on backend
+      try {
+        const { updateUserSubscription } = require('./MusicService');
+        const user = await SecureStore.getItemAsync('user_profile').then(data => 
+          data ? JSON.parse(data) : null
+        ).catch(() => null);
+        
+        if (user) {
+          await updateUserSubscription(
+            user.id || user.email || 'anonymous',
+            tier,
+            receiptData,
+            user.email
+          );
+          console.log('IAP: Backend subscription updated successfully');
+        }
+      } catch (backendError) {
+        console.warn('IAP: Failed to update backend subscription:', backendError);
+        // Don't fail the purchase if backend update fails
+      }
 
       // Acknowledge the purchase if needed
-      if (purchase.acknowledged === false) {
+      if (purchase.acknowledged === false && InAppPurchases.finishTransactionAsync) {
         await InAppPurchases.finishTransactionAsync(purchase, false);
         console.log('IAP: Purchase acknowledged');
       }
