@@ -189,7 +189,7 @@ export default function SongResultModal({
                       
                       <View style={styles.detailItem}>
                         <Ionicons name="documents-outline" size={16} color={Colors.lightGreen} />
-                        <Text style={styles.detailText}>MIDI Files</Text>
+                        <Text style={styles.detailText}>Audio</Text>
                       </View>
                     </View>
 

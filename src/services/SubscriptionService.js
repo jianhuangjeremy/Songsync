@@ -1,4 +1,5 @@
 import * as SecureStore from "expo-secure-store";
+import { SharingService } from "./SharingService";
 
 // Subscription tiers
 export const SUBSCRIPTION_TIERS = {
@@ -35,8 +36,7 @@ export const SUBSCRIPTION_CONFIG = {
       "10 song identifications per day",
       "Advanced music analysis",
       "Unlimited song library",
-      "Priority support",
-      "No ads",
+      "No ads interruption",
     ],
     color: "#8B5CF6", // purple
     gradient: ["#8B5CF6", "#7C3AED"],
@@ -44,17 +44,23 @@ export const SUBSCRIPTION_CONFIG = {
   [SUBSCRIPTION_TIERS.PREMIUM]: {
     id: "premium",
     name: "Premium",
-    price: 25,
-    priceText: "$25/month",
+    price: 99,
+    priceText: "$99/year",
+    originalPrice: 300,
+    originalPriceText: "$300/year",
+    monthlyOriginalPrice: 25,
+    monthlyOriginalPriceText: "$25/month",
+    isLimitedTimeOffer: true,
+    savings: "Save $201",
+    savingsPercentage: "67% OFF",
     dailyIdentifications: -1, // unlimited
     canDownloadMidi: true,
     features: [
       "Unlimited song identifications",
-      "MIDI file downloads",
+      "Audio downloads",
       "Advanced chord analysis",
       "Detailed timing information",
-      "Priority support",
-      "Exclusive features",
+      "No ads interruption",
     ],
     color: "#EF4444", // red
     gradient: ["#EF4444", "#DC2626"],
@@ -170,12 +176,27 @@ export class SubscriptionService {
     }
   }
 
-  // Increment daily usage
+  // Increment daily usage (handles sharing credits automatically)
   static async incrementDailyUsage() {
     const dateString = this.getCurrentDateString();
     const usageKey = USAGE_KEY_PREFIX + dateString;
 
     try {
+      // Check if we should use sharing credits instead
+      const canIdentify = await this.canIdentifySongs();
+      
+      if (canIdentify.usingSharingCredits) {
+        // Use sharing credit instead of incrementing subscription usage
+        const success = await SharingService.useSharingCredits(1);
+        if (success) {
+          console.log("Used 1 sharing credit for identification");
+          return await this.getDailyUsage(); // Return current subscription usage (unchanged)
+        } else {
+          console.error("Failed to use sharing credit");
+        }
+      }
+
+      // Normal subscription usage increment
       const currentUsage = await this.getDailyUsage();
       const newUsage = currentUsage + 1;
 
@@ -195,28 +216,59 @@ export class SubscriptionService {
     }
   }
 
-  // Check if user can identify songs
+  // Check if user can identify songs (including sharing credits)
   static async canIdentifySongs() {
     const tier = await this.getSubscriptionTier();
     const config = this.getSubscriptionConfig(tier);
 
     // Premium users have unlimited access
     if (config.dailyIdentifications === -1) {
-      return { canUse: true, remaining: -1 };
+      return { canUse: true, remaining: -1, usingSharingCredits: false };
     }
 
     const usage = await this.getDailyUsage();
     const remaining = config.dailyIdentifications - usage;
 
+    // If subscription allows more uses, return that
+    if (remaining > 0) {
+      return {
+        canUse: true,
+        remaining: remaining,
+        used: usage,
+        limit: config.dailyIdentifications,
+        usingSharingCredits: false,
+      };
+    }
+
+    // If subscription limit reached, check sharing credits
+    try {
+      const sharingCredits = await SharingService.getSharingCredits();
+      if (sharingCredits > 0) {
+        return {
+          canUse: true,
+          remaining: sharingCredits,
+          used: usage,
+          limit: config.dailyIdentifications,
+          usingSharingCredits: true,
+          sharingCredits: sharingCredits,
+        };
+      }
+    } catch (error) {
+      console.error("Error checking sharing credits:", error);
+    }
+
+    // No subscription credits and no sharing credits
     return {
-      canUse: remaining > 0,
-      remaining: Math.max(0, remaining),
+      canUse: false,
+      remaining: 0,
       used: usage,
       limit: config.dailyIdentifications,
+      usingSharingCredits: false,
+      sharingCredits: 0,
     };
   }
 
-  // Check if user can download MIDI files
+  // Check if user can download audio
   static async canDownloadMidi() {
     const tier = await this.getSubscriptionTier();
     const config = this.getSubscriptionConfig(tier);
@@ -232,13 +284,26 @@ export class SubscriptionService {
     };
   }
 
-  // Get subscription status with usage info
+  // Get subscription status with usage info (including sharing credits)
   static async getSubscriptionStatus() {
     const tier = await this.getSubscriptionTier();
     const config = this.getSubscriptionConfig(tier);
     const usage = await this.getDailyUsage();
     const identificationStatus = await this.canIdentifySongs();
     const midiStatus = await this.canDownloadMidi();
+    
+    // Get sharing information
+    let sharingInfo = null;
+    try {
+      sharingInfo = await SharingService.getSharingStats();
+    } catch (error) {
+      console.error("Error getting sharing info:", error);
+      sharingInfo = {
+        credits: 0,
+        canShareToday: true,
+        remainingShares: 3,
+      };
+    }
 
     return {
       tier,
@@ -246,6 +311,7 @@ export class SubscriptionService {
       usage,
       identificationStatus,
       midiStatus,
+      sharingInfo,
       isSubscribed: tier !== SUBSCRIPTION_TIERS.FREE,
     };
   }

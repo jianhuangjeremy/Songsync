@@ -14,8 +14,7 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import SubscriptionScreen from './src/screens/SubscriptionScreen';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { Colors } from './src/styles/Colors';
-import ProficiencyModal from './src/components/ProficiencyModal';
-import { UserPreferencesService } from './src/services/UserPreferencesService';
+
 
 // Global unhandled promise rejection handler
 const setupGlobalErrorHandlers = () => {
@@ -53,30 +52,12 @@ const Stack = createStackNavigator();
 
 function AppNavigator() {
   const { user, loading } = useAuth();
-  const [showProficiencyModal, setShowProficiencyModal] = useState(false);
-  const [isCheckingFirstTime, setIsCheckingFirstTime] = useState(true);
 
   useEffect(() => {
-    checkFirstTimeUser();
+    // Remove first-time user check - no longer needed
   }, [user]);
 
-  const checkFirstTimeUser = async () => {
-    if (user) {
-      try {
-        const isFirstTime = await UserPreferencesService.isFirstTimeUser();
-        setShowProficiencyModal(isFirstTime);
-      } catch (error) {
-        console.error('Error checking first time user:', error);
-      }
-    }
-    setIsCheckingFirstTime(false);
-  };
-
-  const handleProficiencyComplete = () => {
-    setShowProficiencyModal(false);
-  };
-
-  if (loading || isCheckingFirstTime) {
+  if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <LinearGradient
@@ -143,12 +124,6 @@ function AppNavigator() {
           )}
         </Stack.Navigator>
       </NavigationContainer>
-      
-      {/* First-time proficiency modal */}
-      <ProficiencyModal
-        visible={showProficiencyModal && !!user}
-        onComplete={handleProficiencyComplete}
-      />
     </>
   );
 }

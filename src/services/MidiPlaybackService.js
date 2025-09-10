@@ -12,7 +12,7 @@ if (Platform.OS !== "web") {
 const API_BASE_URL = "http://localhost:5001";
 
 /**
- * Service for handling MIDI file downloads and playback
+ * Service for handling audio downloads and playback
  */
 export class MidiPlaybackService {
   static midiPlayers = new Map(); // Store multiple players for different songs
@@ -20,7 +20,7 @@ export class MidiPlaybackService {
 
   /**
    * Download and prepare file for playback (prioritize audio over MIDI)
-   * @param {object} midiFile - MIDI file object with downloadUrl, filename, etc.
+   * @param {object} midiFile - Audio object with downloadUrl, filename, etc.
    * @param {string} songId - Unique identifier for the song
    * @returns {Promise<string>} Local file path or URL
    */
@@ -28,10 +28,10 @@ export class MidiPlaybackService {
     try {
       console.log("=== MIDI/Audio Download Debug Info ===");
       console.log("Platform:", Platform.OS);
-      console.log("MIDI File Object:", JSON.stringify(midiFile, null, 2));
+      console.log("Audio Object:", JSON.stringify(midiFile, null, 2));
       console.log("Song ID:", songId);
 
-      // Check if user can download MIDI files
+      // Check if user can download audio
       const midiStatus = await SubscriptionService.canDownloadMidi();
       console.log("MIDI Download Status:", midiStatus);
       if (!midiStatus.canDownload) {
@@ -152,7 +152,7 @@ export class MidiPlaybackService {
 
   /**
    * Load and prepare file for playback
-   * Automatically detects and handles both audio files (.wav) and MIDI files (.mid)
+   * Automatically detects and handles both audio files (.wav) and audio (.mid)
    * @param {string} filePath - Local file path or URL
    * @param {string} songId - Unique identifier for the song
    * @returns {Promise<object>} Audio sound object
@@ -255,9 +255,9 @@ export class MidiPlaybackService {
           throw new Error(`Audio loading failed: ${audioError.message}`);
         }
       } else {
-        // MIDI file - use mock player for visual timing
+        // Audio - use mock player for visual timing
         console.log(
-          "⚠️ MIDI file detected - providing visual timing guide only (no synthesized sound)."
+          "⚠️ Audio detected - providing visual timing guide only (no synthesized sound)."
         );
 
         if (Platform.OS === "web") {
@@ -420,7 +420,7 @@ export class MidiPlaybackService {
   }
 
   /**
-   * Play MIDI file
+   * Play audio
    * @param {string} songId - Unique identifier for the song
    * @returns {Promise<void>}
    */
@@ -450,7 +450,7 @@ export class MidiPlaybackService {
   }
 
   /**
-   * Pause MIDI file
+   * Pause audio
    * @param {string} songId - Unique identifier for the song
    * @returns {Promise<void>}
    */
@@ -471,7 +471,7 @@ export class MidiPlaybackService {
   }
 
   /**
-   * Stop MIDI file
+   * Stop audio
    * @param {string} songId - Unique identifier for the song
    * @returns {Promise<void>}
    */
@@ -635,8 +635,8 @@ export class MidiPlaybackService {
   }
 
   /**
-   * Download MIDI file to device (for user download)
-   * @param {object} midiFile - MIDI file object
+   * Download audio to device (for user download)
+   * @param {object} midiFile - Audio object
    * @param {string} songTitle - Song title for filename
    * @returns {Promise<void>}
    */
@@ -666,7 +666,7 @@ export class MidiPlaybackService {
         link.click();
         document.body.removeChild(link);
 
-        Alert.alert("Download Started", "MIDI file download has started.");
+        Alert.alert("Download Started", "Audio download has started.");
         return;
       }
 
@@ -683,7 +683,7 @@ export class MidiPlaybackService {
       );
 
       if (downloadResult.status === 200) {
-        Alert.alert("Download Complete", `MIDI file saved to: ${fileName}`, [
+        Alert.alert("Download Complete", `Audio saved to: ${fileName}`, [
           { text: "OK" },
         ]);
       } else {
@@ -695,7 +695,7 @@ export class MidiPlaybackService {
       console.error("User MIDI download error:", error);
       Alert.alert(
         "Download Failed",
-        "Failed to download MIDI file. Please try again."
+        "Failed to download audio. Please try again."
       );
     }
   }

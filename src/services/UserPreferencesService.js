@@ -1,7 +1,5 @@
-import * as SecureStore from 'expo-secure-store';
-
-const PROFICIENCY_KEY = 'user_proficiency_level';
-const FIRST_TIME_KEY = 'first_time_user';
+// Default proficiency configuration - no user selection needed
+// Using intermediate level as the optimal default experience
 
 export const PROFICIENCY_LEVELS = {
   BEGINNER: 'beginner',
@@ -46,69 +44,40 @@ export const PROFICIENCY_CONFIG = {
 };
 
 export class UserPreferencesService {
-  // Save user proficiency level
-  static async saveProficiencyLevel(level) {
-    try {
-      await SecureStore.setItemAsync(PROFICIENCY_KEY, level);
-      console.log('Proficiency level saved:', level);
-    } catch (error) {
-      console.error('Error saving proficiency level:', error);
-      // Fallback for development - use localStorage on web
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(PROFICIENCY_KEY, level);
-      }
-    }
+  // Get default proficiency configuration
+  // Always returns intermediate level for best user experience
+  static getDefaultProficiencyConfig() {
+    return PROFICIENCY_CONFIG[PROFICIENCY_LEVELS.INTERMEDIATE];
   }
 
-  // Get user proficiency level
+  // Simplified method that returns default config - keeps compatibility
+  static getProficiencyConfig(level = null) {
+    // Always return intermediate configuration regardless of level
+    return PROFICIENCY_CONFIG[PROFICIENCY_LEVELS.INTERMEDIATE];
+  }
+
+  // Simplified method that returns default level - keeps compatibility  
   static async getProficiencyLevel() {
-    try {
-      const level = await SecureStore.getItemAsync(PROFICIENCY_KEY);
-      return level || null;
-    } catch (error) {
-      console.error('Error getting proficiency level:', error);
-      // Fallback for development - use localStorage on web
-      if (typeof window !== 'undefined') {
-        return localStorage.getItem(PROFICIENCY_KEY) || null;
-      }
-      return null;
-    }
+    // Always return intermediate as default
+    return PROFICIENCY_LEVELS.INTERMEDIATE;
   }
 
-  // Check if user is first time user
+  // Legacy methods kept for backwards compatibility but simplified
+  static async saveProficiencyLevel(level) {
+    // No-op - we no longer save user proficiency preferences
+    console.log('Proficiency level selection disabled - using default intermediate level');
+  }
+
   static async isFirstTimeUser() {
-    try {
-      const firstTime = await SecureStore.getItemAsync(FIRST_TIME_KEY);
-      return firstTime === null; // If no value stored, it's first time
-    } catch (error) {
-      console.error('Error checking first time user:', error);
-      // Fallback for development
-      if (typeof window !== 'undefined') {
-        return localStorage.getItem(FIRST_TIME_KEY) === null;
-      }
-      return true;
-    }
+    // Always return false - no more first-time proficiency setup
+    return false;
   }
 
-  // Mark user as not first time anymore
   static async setNotFirstTime() {
-    try {
-      await SecureStore.setItemAsync(FIRST_TIME_KEY, 'false');
-    } catch (error) {
-      console.error('Error setting first time flag:', error);
-      // Fallback for development
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(FIRST_TIME_KEY, 'false');
-      }
-    }
+    // No-op - first time user concept removed
   }
 
-  // Get proficiency configuration
-  static getProficiencyConfig(level) {
-    return PROFICIENCY_CONFIG[level] || PROFICIENCY_CONFIG[PROFICIENCY_LEVELS.BEGINNER];
-  }
-
-  // Get all proficiency levels for selection
+  // Get all proficiency levels for selection (legacy compatibility)
   static getAllProficiencyLevels() {
     return Object.values(PROFICIENCY_LEVELS).map(level => ({
       value: level,
@@ -118,17 +87,6 @@ export class UserPreferencesService {
 
   // Reset all preferences (for testing)
   static async resetPreferences() {
-    try {
-      await SecureStore.deleteItemAsync(PROFICIENCY_KEY);
-      await SecureStore.deleteItemAsync(FIRST_TIME_KEY);
-      console.log('Preferences reset');
-    } catch (error) {
-      console.error('Error resetting preferences:', error);
-      // Fallback for development
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(PROFICIENCY_KEY);
-        localStorage.removeItem(FIRST_TIME_KEY);
-      }
-    }
+    console.log('No preferences to reset - using default configuration');
   }
 }

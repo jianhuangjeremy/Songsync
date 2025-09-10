@@ -14,32 +14,21 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import Slider from '@react-native-community/slider';
 
 import { Colors } from '../styles/Colors';
 import { GlassStyles } from '../styles/GlassStyles';
 import { useAuth } from '../context/AuthContext';
-import {
-  UserPreferencesService,
-  PROFICIENCY_LEVELS,
-  PROFICIENCY_CONFIG,
-} from '../services/UserPreferencesService';
 
 const { width } = Dimensions.get('window');
 
 export default function SettingsScreen({ navigation }) {
   const { user, signOut } = useAuth();
-  const [proficiencyLevel, setProficiencyLevel] = useState(PROFICIENCY_LEVELS.BEGINNER);
-  const [sliderValue, setSliderValue] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const fadeAnimation = useRef(new Animated.Value(0)).current;
   const slideAnimation = useRef(new Animated.Value(50)).current;
 
   useEffect(() => {
-    loadUserPreferences();
-    
     // Entrance animation
     Animated.parallel([
       Animated.timing(fadeAnimation, {
@@ -55,55 +44,6 @@ export default function SettingsScreen({ navigation }) {
       }),
     ]).start();
   }, []);
-
-  const loadUserPreferences = async () => {
-    try {
-      const level = await UserPreferencesService.getProficiencyLevel();
-      if (level) {
-        setProficiencyLevel(level);
-        const config = PROFICIENCY_CONFIG[level];
-        setSliderValue(config.sliderValue);
-      }
-    } catch (error) {
-      console.error('Error loading preferences:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSliderChange = (value) => {
-    const roundedValue = Math.round(value);
-    setSliderValue(roundedValue);
-    
-    // Map slider value to proficiency level
-    const levels = Object.values(PROFICIENCY_LEVELS);
-    setProficiencyLevel(levels[roundedValue]);
-  };
-
-  const handleSavePreferences = async () => {
-    if (isSaving) return;
-
-    setIsSaving(true);
-    try {
-      await UserPreferencesService.saveProficiencyLevel(proficiencyLevel);
-      
-      // Success feedback
-      Alert.alert(
-        'Settings Saved',
-        'Your music proficiency level has been updated successfully!',
-        [{ text: 'OK', style: 'default' }]
-      );
-    } catch (error) {
-      console.error('Error saving preferences:', error);
-      Alert.alert(
-        'Error',
-        'Failed to save your preferences. Please try again.',
-        [{ text: 'OK', style: 'default' }]
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   const handleSignOut = () => {
     Alert.alert(
@@ -129,22 +69,13 @@ export default function SettingsScreen({ navigation }) {
         {
           text: 'Reset',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              await UserPreferencesService.resetPreferences();
-              setProficiencyLevel(PROFICIENCY_LEVELS.BEGINNER);
-              setSliderValue(0);
-              Alert.alert('Success', 'Your preferences have been reset to default.');
-            } catch (error) {
-              Alert.alert('Error', 'Failed to reset preferences.');
-            }
+          onPress: () => {
+            Alert.alert('Success', 'Your preferences have been reset to default.');
           },
         },
       ]
     );
   };
-
-  const currentConfig = PROFICIENCY_CONFIG[proficiencyLevel];
 
   if (isLoading) {
     return (
@@ -221,137 +152,6 @@ export default function SettingsScreen({ navigation }) {
               </BlurView>
             </View>
 
-            {/* Proficiency Level Section */}
-            <View style={styles.section}>
-              <BlurView intensity={Platform.OS === 'ios' ? 100 : 80} style={styles.sectionBlur}>
-                <LinearGradient
-                  colors={[
-                    Colors.black + '40',
-                    Colors.purple + '20',
-                    Colors.black + '40',
-                  ]}
-                  style={styles.sectionGradient}
-                >
-                  <View style={styles.sectionHeader}>
-                    <Ionicons name="musical-notes" size={24} color={Colors.lightGreen} />
-                    <Text style={styles.sectionTitle}>Music Proficiency Level</Text>
-                  </View>
-
-                  {/* Current Level Display */}
-                  <View style={[styles.levelDisplay, { borderColor: currentConfig.color }]}>
-                    <LinearGradient
-                      colors={[currentConfig.color + '20', 'transparent']}
-                      style={styles.levelGradient}
-                    >
-                      <Text style={[styles.levelLabel, { color: currentConfig.color }]}>
-                        {currentConfig.label}
-                      </Text>
-                      <Text style={styles.levelDescription}>
-                        {currentConfig.description}
-                      </Text>
-                    </LinearGradient>
-                  </View>
-
-                  {/* Slider */}
-                  <View style={styles.sliderContainer}>
-                    <Slider
-                      style={styles.slider}
-                      minimumValue={0}
-                      maximumValue={2}
-                      step={1}
-                      value={sliderValue}
-                      onValueChange={handleSliderChange}
-                      minimumTrackTintColor={Colors.lightGreen}
-                      maximumTrackTintColor={Colors.gray + '40'}
-                      thumbStyle={[styles.sliderThumb, { backgroundColor: currentConfig.color }]}
-                      trackStyle={styles.sliderTrack}
-                    />
-                    
-                    {/* Slider Labels */}
-                    <View style={styles.sliderLabels}>
-                      <Text style={[
-                        styles.sliderLabel,
-                        proficiencyLevel === PROFICIENCY_LEVELS.BEGINNER && styles.selectedSliderLabel
-                      ]}>
-                        Beginner
-                      </Text>
-                      <Text style={[
-                        styles.sliderLabel,
-                        proficiencyLevel === PROFICIENCY_LEVELS.INTERMEDIATE && styles.selectedSliderLabel
-                      ]}>
-                        Intermediate
-                      </Text>
-                      <Text style={[
-                        styles.sliderLabel,
-                        proficiencyLevel === PROFICIENCY_LEVELS.ADVANCED && styles.selectedSliderLabel
-                      ]}>
-                        Advanced
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Features Preview */}
-                  <View style={styles.featuresContainer}>
-                    <Text style={styles.featuresTitle}>Analysis Features:</Text>
-                    <View style={styles.featuresList}>
-                      <View style={styles.featureItem}>
-                        <Ionicons 
-                          name={currentConfig.showAdvancedChords ? "checkmark-circle" : "close-circle"} 
-                          size={16} 
-                          color={currentConfig.showAdvancedChords ? Colors.lightGreen : Colors.gray} 
-                        />
-                        <Text style={styles.featureText}>Advanced chord progressions</Text>
-                      </View>
-                      <View style={styles.featureItem}>
-                        <Ionicons 
-                          name={currentConfig.showComplexAnalysis ? "checkmark-circle" : "close-circle"} 
-                          size={16} 
-                          color={currentConfig.showComplexAnalysis ? Colors.lightGreen : Colors.gray} 
-                        />
-                        <Text style={styles.featureText}>Complex music theory analysis</Text>
-                      </View>
-                      <View style={styles.featureItem}>
-                        <Ionicons 
-                          name={currentConfig.showDetailedTiming ? "checkmark-circle" : "close-circle"} 
-                          size={16} 
-                          color={currentConfig.showDetailedTiming ? Colors.lightGreen : Colors.gray} 
-                        />
-                        <Text style={styles.featureText}>Detailed timing information</Text>
-                      </View>
-                      <View style={styles.featureItem}>
-                        <Ionicons name="information-circle" size={16} color={Colors.lightGreen} />
-                        <Text style={styles.featureText}>
-                          Max {currentConfig.maxChordsDisplayed} chords displayed
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Save Button */}
-                  <TouchableOpacity
-                    style={[styles.saveButton, isSaving && styles.disabledButton]}
-                    onPress={handleSavePreferences}
-                    disabled={isSaving}
-                    activeOpacity={0.7}
-                  >
-                    <LinearGradient
-                      colors={[Colors.lightGreen, Colors.lightGreen + 'CC']}
-                      style={styles.buttonGradient}
-                    >
-                      {isSaving ? (
-                        <Text style={styles.buttonText}>Saving...</Text>
-                      ) : (
-                        <>
-                          <Text style={styles.buttonText}>Save Changes</Text>
-                          <Ionicons name="checkmark" size={20} color={Colors.black} />
-                        </>
-                      )}
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </LinearGradient>
-              </BlurView>
-            </View>
-
             {/* Other Settings Section */}
             <View style={styles.section}>
               <BlurView intensity={Platform.OS === 'ios' ? 100 : 80} style={styles.sectionBlur}>
@@ -376,7 +176,7 @@ export default function SettingsScreen({ navigation }) {
                       <Ionicons name="card" size={20} color={Colors.purple} />
                       <Text style={styles.settingText}>Manage Subscription</Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={20} color={Colors.gray} />
+                    <Ionicons name="chevron-forward" size={20} color={Colors.white} />
                   </TouchableOpacity>
 
                   <TouchableOpacity style={styles.settingItem} onPress={handleResetPreferences}>
@@ -384,7 +184,7 @@ export default function SettingsScreen({ navigation }) {
                       <Ionicons name="refresh" size={20} color={Colors.orange} />
                       <Text style={styles.settingText}>Reset to Default</Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={20} color={Colors.gray} />
+                    <Ionicons name="chevron-forward" size={20} color={Colors.white} />
                   </TouchableOpacity>
 
                   <TouchableOpacity style={styles.settingItem} onPress={handleSignOut}>
@@ -392,7 +192,7 @@ export default function SettingsScreen({ navigation }) {
                       <Ionicons name="log-out" size={20} color={Colors.red} />
                       <Text style={[styles.settingText, { color: Colors.red }]}>Sign Out</Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={20} color={Colors.gray} />
+                    <Ionicons name="chevron-forward" size={20} color={Colors.white} />
                   </TouchableOpacity>
                 </LinearGradient>
               </BlurView>
@@ -508,110 +308,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.white,
   },
-  levelDisplay: {
-    borderRadius: 15,
-    borderWidth: 2,
-    marginBottom: 20,
-    overflow: 'hidden',
-  },
-  levelGradient: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  levelLabel: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  levelDescription: {
-    fontSize: 14,
-    color: Colors.white,
-    opacity: 0.8,
-  },
-  sliderContainer: {
-    marginBottom: 20,
-  },
-  slider: {
-    width: '100%',
-    height: 40,
-  },
-  sliderThumb: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-  },
-  sliderTrack: {
-    height: 6,
-    borderRadius: 3,
-  },
-  sliderLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
-  },
-  sliderLabel: {
-    fontSize: 12,
-    color: Colors.white,
-    opacity: 0.7,
-  },
-  selectedSliderLabel: {
-    color: Colors.lightGreen,
-    fontWeight: '600',
-  },
-  featuresContainer: {
-    backgroundColor: Colors.black + '20',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 20,
-  },
-  featuresTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.white,
-    marginBottom: 10,
-  },
-  featuresList: {
-    gap: 8,
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  featureText: {
-    fontSize: 13,
-    color: Colors.white,
-    opacity: 0.8,
-    flex: 1,
-  },
-  saveButton: {
-    borderRadius: 15,
-    overflow: 'hidden',
-    ...GlassStyles.container,
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  buttonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 25,
-    gap: 10,
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.black,
-  },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.gray + '20',
+    borderBottomColor: Colors.white + '20',
   },
   settingContent: {
     flexDirection: 'row',

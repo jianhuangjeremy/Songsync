@@ -79,7 +79,7 @@ export default function AuthScreen() {
             </View>
             <Text style={styles.title}>Songbook</Text>
             <Text style={styles.subtitle}>
-              Identify music playing in your environment
+              Identify and find audio Immediately.
             </Text>
           </View>
 
@@ -91,7 +91,7 @@ export default function AuthScreen() {
             >
               <Text style={styles.authTitle}>Get Started</Text>
               <Text style={styles.authSubtitle}>
-                Sign in to save your music discoveries
+                Sign in to explore more
               </Text>
 
               <TouchableOpacity

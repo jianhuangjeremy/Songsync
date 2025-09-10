@@ -22,6 +22,7 @@ import {
   SUBSCRIPTION_TIERS, 
   SUBSCRIPTION_CONFIG 
 } from '../services/SubscriptionService';
+import SharingModal from './SharingModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -30,12 +31,14 @@ export default function UpgradeModal({
   onClose, 
   onUpgrade,
   currentTier = SUBSCRIPTION_TIERS.FREE,
-  reason = 'limit_reached' // 'limit_reached', 'midi_download', 'feature_access'
+  reason = 'limit_reached', // 'limit_reached', 'midi_download', 'feature_access'
+  userId // Add userId prop for sharing
 }) {
   const [selectedTier, setSelectedTier] = useState(
     currentTier === SUBSCRIPTION_TIERS.FREE ? SUBSCRIPTION_TIERS.BASIC : SUBSCRIPTION_TIERS.PREMIUM
   );
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showSharingModal, setShowSharingModal] = useState(false);
 
   const scaleAnimation = useRef(new Animated.Value(0.8)).current;
   const fadeAnimation = useRef(new Animated.Value(0)).current;
@@ -89,7 +92,7 @@ export default function UpgradeModal({
   const getModalMessage = () => {
     switch (reason) {
       case 'midi_download':
-        return 'MIDI file downloads are available for Premium subscribers only.';
+        return 'Audio downloads are available for Premium subscribers only.';
       case 'feature_access':
         return 'Unlock advanced features with a subscription.';
       default:
@@ -201,6 +204,8 @@ export default function UpgradeModal({
           <LinearGradient
             colors={isSelected ? [...config.gradient, config.color + '20'] : [Colors.black + '40', 'transparent']}
             style={styles.planCardGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
           >
             {/* Plan Header */}
             <View style={styles.planHeader}>
@@ -346,6 +351,26 @@ export default function UpgradeModal({
                       </LinearGradient>
                     </TouchableOpacity>
                   )}
+
+                  {/* Free Credits Option - Show only for limit_reached reason */}
+                  {reason === 'limit_reached' && userId && (
+                    <TouchableOpacity
+                      style={[styles.shareButton, GlassStyles.container]}
+                      onPress={() => setShowSharingModal(true)}
+                      activeOpacity={0.7}
+                    >
+                      <LinearGradient
+                        colors={[Colors.lightGreen + '20', Colors.purple + '20']}
+                        style={styles.shareButtonGradient}
+                      >
+                        <Ionicons name="share-social" size={20} color={Colors.lightGreen} />
+                        <Text style={styles.shareButtonText}>
+                          Get Free Credits by Sharing
+                        </Text>
+                        <Ionicons name="gift" size={16} color={Colors.yellow} />
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  )}
                   
                   <TouchableOpacity
                     style={styles.laterButton}
@@ -360,6 +385,18 @@ export default function UpgradeModal({
           </Animated.View>
         </LinearGradient>
       </View>
+      
+      {/* Sharing Modal */}
+      <SharingModal
+        visible={showSharingModal}
+        onClose={() => setShowSharingModal(false)}
+        onCreditsEarned={() => {
+          setShowSharingModal(false);
+          // Optionally close the upgrade modal too since user got credits
+          handleClose();
+        }}
+        userId={userId}
+      />
     </Modal>
   );
 }
@@ -377,21 +414,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   container: {
-    width: width * 0.95,
-    maxWidth: 450,
-    maxHeight: height * 0.9,
+    width: width * 0.86,
+    maxWidth: 370,
+    maxHeight: height * 0.8,
+    marginHorizontal: 20,
   },
   blurContainer: {
     borderRadius: 25,
     overflow: 'hidden',
+    flex: 1,
     ...GlassStyles.container,
   },
   contentGradient: {
-    padding: 20,
+    padding: 18,
+    flex: 1,
+    justifyContent: 'space-between',
+    borderRadius: 25,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 25,
+    marginBottom: 15,
+    flexShrink: 0,
   },
   closeButton: {
     position: 'absolute',
@@ -406,53 +449,60 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: Colors.black + '30',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 10,
     ...GlassStyles.container,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: Colors.white,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 16,
-    color: Colors.gray,
+    fontSize: 14,
+    color: Colors.white,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 20,
+    opacity: 0.9,
   },
   plansContainer: {
-    maxHeight: height * 0.4,
-    marginBottom: 20,
+    flex: 1,
+    marginBottom: 12,
+    minHeight: 0,
+    paddingHorizontal: 1,
   },
   planCard: {
     borderRadius: 15,
-    marginBottom: 15,
+    marginBottom: 10,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: Colors.gray + '30',
+    marginHorizontal: 1,
   },
   currentPlanCard: {
     opacity: 0.7,
   },
   planCardBlur: {
     flex: 1,
+    borderRadius: 15,
   },
   planCardGradient: {
-    padding: 20,
+    padding: 14,
+    borderRadius: 15,
+    overflow: 'hidden',
   },
   planHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 10,
   },
   planTitleContainer: {
     flexDirection: 'row',
@@ -460,7 +510,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   planName: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
   },
   currentBadge: {
@@ -475,13 +525,13 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   planPrice: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: Colors.white,
   },
   featuresContainer: {
-    gap: 8,
-    marginBottom: 15,
+    gap: 5,
+    marginBottom: 10,
   },
   featureItem: {
     flexDirection: 'row',
@@ -489,9 +539,10 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   featureText: {
-    fontSize: 14,
-    color: Colors.gray,
+    fontSize: 13,
+    color: Colors.white,
     flex: 1,
+    opacity: 0.9,
   },
   selectionIndicator: {
     flexDirection: 'row',
@@ -507,7 +558,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   actionContainer: {
-    gap: 12,
+    gap: 10,
+    flexShrink: 0,
   },
   upgradeButton: {
     borderRadius: 15,
@@ -521,14 +573,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 25,
-    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    gap: 8,
+    borderRadius: 15,
   },
   buttonText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: Colors.white,
+  },
+  shareButton: {
+    borderRadius: 15,
+    overflow: 'hidden',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.lightGreen + '30',
+  },
+  shareButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  shareButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.lightGreen,
+    flex: 1,
+    textAlign: 'center',
   },
   laterButton: {
     paddingVertical: 12,
@@ -536,7 +611,8 @@ const styles = StyleSheet.create({
   },
   laterButtonText: {
     fontSize: 16,
-    color: Colors.gray,
+    color: Colors.white,
     fontWeight: '500',
+    opacity: 0.7,
   },
 });

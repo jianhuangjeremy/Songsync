@@ -279,11 +279,11 @@ export default function HomeScreen({ navigation }) {
     try {
       // Check subscription limits before starting recording
       const canIdentify = await SubscriptionService.canIdentifySongs();
-      // if (!canIdentify.canUse) {
-      //   setUpgradeReason("limit_reached");
-      //   setShowUpgradeModal(true);
-      //   return;
-      // }
+      if (!canIdentify.canUse) {
+        setUpgradeReason("limit_reached");
+        setShowUpgradeModal(true);
+        return;
+      }
 
       const hasPermission = await requestPermissions();
       if (!hasPermission) return;
@@ -453,12 +453,11 @@ export default function HomeScreen({ navigation }) {
 
         // Check subscription limits before starting recording (only for new attempts)
         const canIdentify = await SubscriptionService.canIdentifySongs();
-        // Uncomment this when subscription limits are enforced
-        // if (!canIdentify.canUse) {
-        //   setUpgradeReason("limit_reached");
-        //   setShowUpgradeModal(true);
-        //   return;
-        // }
+        if (!canIdentify.canUse) {
+          setUpgradeReason("limit_reached");
+          setShowUpgradeModal(true);
+          return;
+        }
 
         // Start new identification session
         sessionId = await IdentificationRetryService.startIdentificationSession(
@@ -674,10 +673,10 @@ export default function HomeScreen({ navigation }) {
                   song.name
                 );
               } catch (error) {
-                console.error("Error downloading MIDI file:", error);
+                console.error("Error downloading audio:", error);
                 Alert.alert(
                   "Error",
-                  "Failed to download MIDI file. Please try again."
+                  "Failed to download audio. Please try again."
                 );
               }
             },
@@ -686,7 +685,7 @@ export default function HomeScreen({ navigation }) {
       );
     } catch (error) {
       console.error("Error checking MIDI download permission:", error);
-      Alert.alert("Error", "Unable to download MIDI file. Please try again.");
+      Alert.alert("Error", "Unable to download audio. Please try again.");
     }
   };
 
@@ -763,9 +762,8 @@ export default function HomeScreen({ navigation }) {
               style={[styles.userCard, GlassStyles.glassContainer]}
             >
               <View style={styles.userTextContainer}>
-                <Text style={styles.welcomeText}>Welcome back,</Text>
                 <Text style={styles.userName}>
-                  {user?.name || "Music Lover"}
+                  {user?.name || "Demo User"}
                 </Text>
               </View>
 
@@ -778,8 +776,14 @@ export default function HomeScreen({ navigation }) {
                       {subscriptionStatus.identificationStatus.limit === -1
                         ? "∞"
                         : subscriptionStatus.identificationStatus.limit}
+                      {subscriptionStatus.sharingInfo?.credits > 0 && 
+                        ` (+${subscriptionStatus.sharingInfo.credits})`
+                      }
                     </Text>
-                    <Text style={styles.usageLabel}>Daily IDs</Text>
+                    <Text style={styles.usageLabel}>
+                      Daily IDs
+                      {subscriptionStatus.sharingInfo?.credits > 0 && " + Bonus"}
+                    </Text>
                   </View>
                   <View
                     style={[
@@ -840,20 +844,15 @@ export default function HomeScreen({ navigation }) {
                 ? `Listening... ${recordingCountdown}s`
                 : isProcessing
                 ? "Identifying song..."
-                : "Tap to identify ambient music"}
+                : "Convert Music to audio"}
             </Text>
             <Text style={styles.statusSubtext}>
               {isRecording
                 ? "Listening to ambient music in your environment"
                 : isProcessing
                 ? "Analyzing audio patterns and finding song details"
-                : "Tap to capture music playing around you"}
+                : "Capture music playing around you"}
             </Text>
-            {!isRecording && !isProcessing && recentResults.length > 0 && (
-              <Text style={styles.scrollHintSubtext}>
-                ↓ Scroll down to see your recent discoveries
-              </Text>
-            )}
           </View>
 
           {/* Search Interface */}
@@ -865,7 +864,7 @@ export default function HomeScreen({ navigation }) {
                 activeOpacity={0.8}
               >
                 <Ionicons name="search" size={24} color={Colors.lightGreen} />
-                <Text style={styles.searchToggleText}>Search Songs</Text>
+                <Text style={styles.searchToggleText}>Search</Text>
               </TouchableOpacity>
             )}
 
@@ -974,7 +973,7 @@ export default function HomeScreen({ navigation }) {
                   color={Colors.lightGreen}
                 />
                 <Text style={styles.instructionText}>
-                  Tap to start recording ambient music
+                  Tap to start recording
                 </Text>
               </View>
               <View style={styles.instructionStep}>
@@ -996,7 +995,7 @@ export default function HomeScreen({ navigation }) {
               <View style={styles.instructionStep}>
                 <Ionicons name="musical-note" size={20} color={Colors.purple} />
                 <Text style={styles.instructionText}>
-                  Access chords and MIDI files
+                  Access chords and audio
                 </Text>
               </View>
             </BlurView>
@@ -1136,6 +1135,7 @@ export default function HomeScreen({ navigation }) {
           }}
           currentTier={subscriptionStatus?.tier}
           reason={upgradeReason}
+          userId={user?.id}
         />
       </SafeAreaView>
     </LinearGradient>

@@ -10,6 +10,7 @@ export const Colors = {
   lightGray: '#D1D5DB',
   red: '#EF4444',
   orange: '#F97316',
+  yellow: '#F59E0B',
   glass: 'rgba(255, 255, 255, 0.1)',
   glassBlur: 'rgba(0, 0, 0, 0.3)',
 };

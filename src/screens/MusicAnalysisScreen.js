@@ -21,10 +21,9 @@ import StarRating from "../components/StarRating";
 import { FeedbackService } from "../services/FeedbackService";
 import {
   UserPreferencesService,
-  PROFICIENCY_CONFIG,
 } from "../services/UserPreferencesService";
-import { MidiPlaybackService } from "../services/MidiPlaybackService";
 import { SubscriptionService } from "../services/SubscriptionService";
+import { MidiPlaybackService } from "../services/MidiPlaybackService";
 
 const { width } = Dimensions.get("window");
 
@@ -188,6 +187,7 @@ export default function MusicAnalysisScreen({ route, navigation }) {
   const [musicData, setMusicData] = useState(null);
   const [userRating, setUserRating] = useState(0);
   const [proficiencyConfig, setProficiencyConfig] = useState(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState(null);
 
   // MIDI playback state
   const [isMidiPlaying, setIsMidiPlaying] = useState(false);
@@ -239,12 +239,13 @@ export default function MusicAnalysisScreen({ route, navigation }) {
 
   const loadMusicData = async () => {
     try {
-      // Load user proficiency level
-      const userProficiency =
-        await UserPreferencesService.getProficiencyLevel();
-      const config =
-        UserPreferencesService.getProficiencyConfig(userProficiency);
+      // Get default proficiency configuration (intermediate level)
+      const config = UserPreferencesService.getDefaultProficiencyConfig();
       setProficiencyConfig(config);
+
+      // Load subscription status
+      const subStatus = await SubscriptionService.getSubscriptionStatus();
+      setSubscriptionStatus(subStatus);
 
       // Load existing rating for this song
       const existingRating = await FeedbackService.getRating(
@@ -388,9 +389,9 @@ export default function MusicAnalysisScreen({ route, navigation }) {
 
       setMidiLoaded(true);
       setMidiLoading(false);
-      console.log("MIDI file loaded successfully");
+      console.log("Audio loaded successfully");
     } catch (error) {
-      console.error("Error loading MIDI file:", error);
+      console.error("Error loading audio:", error);
       setMidiError(error.message);
       setMidiLoading(false);
 
@@ -401,7 +402,7 @@ export default function MusicAnalysisScreen({ route, navigation }) {
           [{ text: "OK" }]
         );
       } else {
-        Alert.alert("Error", "Failed to load MIDI file. Please try again.");
+        Alert.alert("Error", "Failed to load audio. Please try again.");
       }
     }
   };
@@ -447,6 +448,28 @@ export default function MusicAnalysisScreen({ route, navigation }) {
 
   const handleMidiDownload = async () => {
     try {
+      // Check if user has premium access
+      const midiStatus = await SubscriptionService.canDownloadMidi();
+      
+      if (midiStatus.requiresUpgrade) {
+        Alert.alert(
+          "Premium Required",
+          "Audio downloads are available for Premium subscribers only. Upgrade to Premium to unlock backing tracks and enhanced features.",
+          [
+            {
+              text: "Cancel",
+              style: "cancel"
+            },
+            {
+              text: "Upgrade",
+              style: "default",
+              onPress: () => navigation.navigate("SubscriptionScreen")
+            }
+          ]
+        );
+        return;
+      }
+
       if (!musicData?.audioFile) {
         Alert.alert("Error", "No audio file available for download.");
         return;
@@ -458,7 +481,7 @@ export default function MusicAnalysisScreen({ route, navigation }) {
       );
     } catch (error) {
       console.error("Error downloading MIDI:", error);
-      Alert.alert("Error", "Failed to download MIDI file. Please try again.");
+      Alert.alert("Error", "Failed to download audio. Please try again.");
     }
   };
 
@@ -760,14 +783,33 @@ export default function MusicAnalysisScreen({ route, navigation }) {
             </View>
           )}
           <TouchableOpacity
-            style={styles.headerButton}
+            style={[
+              styles.headerButton,
+              subscriptionStatus?.midiStatus?.requiresUpgrade && styles.premiumRequiredButton
+            ]}
             onPress={handleMidiDownload}
           >
-            <Ionicons
-              name="download-outline"
-              size={20}
-              color={Colors.lightGreen}
-            />
+            {subscriptionStatus?.midiStatus?.requiresUpgrade ? (
+              <View style={styles.premiumIconContainer}>
+                <Ionicons
+                  name="download-outline"
+                  size={16}
+                  color={Colors.orange}
+                />
+                <Ionicons
+                  name="star"
+                  size={12}
+                  color={Colors.orange}
+                  style={styles.premiumStar}
+                />
+              </View>
+            ) : (
+              <Ionicons
+                name="download-outline"
+                size={20}
+                color={Colors.lightGreen}
+              />
+            )}
           </TouchableOpacity>
         </View>
 
@@ -1257,5 +1299,21 @@ const styles = StyleSheet.create({
     color: Colors.lightGray,
     opacity: 0.8,
     textAlign: "center",
+  },
+  // Premium-related styles
+  premiumRequiredButton: {
+    backgroundColor: "rgba(239, 68, 68, 0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.3)",
+  },
+  premiumIconContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+  },
+  premiumStar: {
+    position: "absolute",
+    top: -2,
+    right: -2,
   },
 });

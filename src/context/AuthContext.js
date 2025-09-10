@@ -1,19 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { Platform } from "react-native";
 
-// Conditional Apple Auth import
-let appleAuth;
-try {
-  if (Platform.OS === "ios") {
-    appleAuth =
-      require("@invertase/react-native-apple-authentication").appleAuth;
-  }
-} catch (error) {
-  console.log(
-    "Apple Authentication not available, using fallback authentication"
-  );
-  appleAuth = undefined;
-}
+// Apple Auth not available - using demo authentication
+const appleAuth = undefined;
 
 // Conditional imports for platform compatibility
 let SecureStore, AuthSession, WebBrowser;
@@ -74,31 +63,18 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Function to refresh access token
+  // Function to refresh access token (demo mode)
   const refreshAccessToken = async () => {
     if (!refreshToken) {
       throw new Error("No refresh token available");
     }
 
     try {
-      const response = await fetch(`${AUTH_SERVICE_URL}/token`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ refreshToken }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setAccessToken(data.accessToken);
-        await SecureStore.setItemAsync("accessToken", data.accessToken);
-        return data.accessToken;
-      } else {
-        // Refresh token is invalid, need to re-authenticate
-        await signOut();
-        throw new Error("Session expired. Please sign in again.");
-      }
+      // Generate a new mock access token for demo
+      const newAccessToken = "mock_refreshed_access_token_" + Date.now();
+      setAccessToken(newAccessToken);
+      await SecureStore.setItemAsync("accessToken", newAccessToken);
+      return newAccessToken;
     } catch (error) {
       console.error("Token refresh error:", error);
       await signOut();
@@ -106,28 +82,16 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Get valid access token (refresh if needed)
+  // Get valid access token (demo mode - always return current token)
   const getValidAccessToken = async () => {
     if (!accessToken) {
       throw new Error("No access token available");
     }
 
     try {
-      // Try to use current token first
-      const testResponse = await fetch(`${AUTH_SERVICE_URL}/hello`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-      if (testResponse.ok) {
-        return accessToken;
-      } else if (testResponse.status === 401) {
-        // Token expired, try to refresh
-        return await refreshAccessToken();
-      } else {
-        throw new Error("Authentication failed");
-      }
+      // In demo mode, we assume the token is always valid
+      // In production, you would validate against your backend
+      return accessToken;
     } catch (error) {
       console.error("Token validation error:", error);
       throw error;
@@ -136,8 +100,7 @@ export const AuthProvider = ({ children }) => {
 
   const signInWithGoogle = async () => {
     try {
-      // For demo purposes, we'll simulate Google auth
-      // In production, you would use actual Google OAuth
+      // For demo purposes, we'll simulate Google auth without backend
       const mockUser = {
         id: "google_" + Date.now(),
         name: "Demo User",
@@ -146,36 +109,23 @@ export const AuthProvider = ({ children }) => {
         avatar: null,
       };
 
-      // Send to backend for token generation
-      const response = await fetch(`${AUTH_SERVICE_URL}/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username: mockUser.email,
-          password: "demo_password", // In real implementation, this would be OAuth token
-        }),
-      });
+      // Generate mock tokens for demo
+      const mockTokenData = {
+        accessToken: "mock_access_token_" + Date.now(),
+        refreshToken: "mock_refresh_token_" + Date.now(),
+      };
 
-      if (response.ok) {
-        const tokenData = await response.json();
+      // Store user and tokens
+      await SecureStore.setItemAsync("user", JSON.stringify(mockUser));
+      await SecureStore.setItemAsync("accessToken", mockTokenData.accessToken);
+      await SecureStore.setItemAsync("refreshToken", mockTokenData.refreshToken);
 
-        // Store user and tokens
-        await SecureStore.setItemAsync("user", JSON.stringify(mockUser));
-        await SecureStore.setItemAsync("accessToken", tokenData.accessToken);
-        await SecureStore.setItemAsync("refreshToken", tokenData.refreshToken);
+      setUser(mockUser);
+      setAccessToken(mockTokenData.accessToken);
+      setRefreshToken(mockTokenData.refreshToken);
 
-        setUser(mockUser);
-        setAccessToken(tokenData.accessToken);
-        setRefreshToken(tokenData.refreshToken);
-
-        console.log("Google sign in successful");
-        return { success: true };
-      } else {
-        const error = await response.json();
-        throw new Error(error.error || "Authentication failed");
-      }
+      console.log("Google sign in successful");
+      return { success: true };
     } catch (error) {
       console.error("Google sign in error:", error);
       return { success: false, error: error.message };
@@ -278,44 +228,33 @@ export const AuthProvider = ({ children }) => {
         }
       }
 
-      // Demo/fallback authentication using hardcoded credentials
+      // Demo/fallback authentication without backend server
       console.log("Using demo authentication for Apple Sign-In...");
-      const response = await fetch(`${AUTH_SERVICE_URL}/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username: "jeremywongjian@outlook.com",
-          password: "toddleMic1!",
-        }),
-      });
+      
+      // Generate mock tokens for demo
+      const mockTokenData = {
+        accessToken: "mock_apple_access_token_" + Date.now(),
+        refreshToken: "mock_apple_refresh_token_" + Date.now(),
+      };
 
-      if (response.ok) {
-        const tokenData = await response.json();
+      const mockUser = {
+        id: "apple_demo_" + Date.now(),
+        name: "Demo Apple User",
+        email: "demo@privaterelay.appleid.com",
+        provider: "apple",
+        avatar: null,
+      };
 
-        const mockUser = {
-          id: "apple_demo_" + Date.now(),
-          name: "Demo Apple User",
-          email: "demo@privaterelay.appleid.com",
-          provider: "apple",
-          avatar: null,
-        };
+      await SecureStore.setItemAsync("user", JSON.stringify(mockUser));
+      await SecureStore.setItemAsync("accessToken", mockTokenData.accessToken);
+      await SecureStore.setItemAsync("refreshToken", mockTokenData.refreshToken);
 
-        await SecureStore.setItemAsync("user", JSON.stringify(mockUser));
-        await SecureStore.setItemAsync("accessToken", tokenData.accessToken);
-        await SecureStore.setItemAsync("refreshToken", tokenData.refreshToken);
+      setUser(mockUser);
+      setAccessToken(mockTokenData.accessToken);
+      setRefreshToken(mockTokenData.refreshToken);
 
-        setUser(mockUser);
-        setAccessToken(tokenData.accessToken);
-        setRefreshToken(tokenData.refreshToken);
-
-        console.log("Apple sign in successful (demo mode)");
-        return { success: true };
-      } else {
-        const error = await response.json();
-        throw new Error(error.error || "Authentication failed");
-      }
+      console.log("Apple sign in successful (demo mode)");
+      return { success: true };
     } catch (error) {
       console.error("Apple sign in error:", error);
       return { success: false, error: error.message };
@@ -324,18 +263,7 @@ export const AuthProvider = ({ children }) => {
 
   const signOut = async () => {
     try {
-      // Logout on backend to invalidate refresh token
-      if (refreshToken) {
-        await fetch(`${AUTH_SERVICE_URL}/logout`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ refreshToken }),
-        });
-      }
-
-      // Clear local storage
+      // Clear local storage (no backend call needed for demo)
       await SecureStore.deleteItemAsync("user");
       await SecureStore.deleteItemAsync("accessToken");
       await SecureStore.deleteItemAsync("refreshToken");

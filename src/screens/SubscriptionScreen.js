@@ -26,6 +26,244 @@ import UpgradeModal from '../components/UpgradeModal';
 
 const { width } = Dimensions.get('window');
 
+// Plan Card Component with Hover Effects
+const PlanCard = ({ tier, config, isCurrent, onUpgrade }) => {
+  const scaleAnimation = useRef(new Animated.Value(1)).current;
+  const shadowAnimation = useRef(new Animated.Value(0)).current;
+  const borderAnimation = useRef(new Animated.Value(isCurrent ? 3 : 1)).current;
+  const glowAnimation = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (isCurrent) {
+      // Brief expand animation for current plan
+      Animated.sequence([
+        Animated.timing(scaleAnimation, {
+          toValue: 1.05,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnimation, {
+          toValue: 1.02,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Glow effect for current plan
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnimation, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: false,
+          }),
+          Animated.timing(glowAnimation, {
+            toValue: 0,
+            duration: 2000,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+    }
+  }, [isCurrent]);
+
+  const handlePressIn = () => {
+    Animated.parallel([
+      Animated.timing(scaleAnimation, {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shadowAnimation, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: false,
+      }),
+    ]).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.parallel([
+      Animated.timing(scaleAnimation, {
+        toValue: isCurrent ? 1.02 : 1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shadowAnimation, {
+        toValue: isCurrent ? 0.5 : 0,
+        duration: 150,
+        useNativeDriver: false,
+      }),
+    ]).start();
+  };
+
+  const handleHoverIn = () => {
+    if (Platform.OS === 'web') {
+      Animated.parallel([
+        Animated.timing(scaleAnimation, {
+          toValue: 1.02,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shadowAnimation, {
+          toValue: 0.8,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+        Animated.timing(borderAnimation, {
+          toValue: 2,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+      ]).start();
+    }
+  };
+
+  const handleHoverOut = () => {
+    if (Platform.OS === 'web') {
+      Animated.parallel([
+        Animated.timing(scaleAnimation, {
+          toValue: isCurrent ? 1.02 : 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shadowAnimation, {
+          toValue: isCurrent ? 0.3 : 0,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+        Animated.timing(borderAnimation, {
+          toValue: isCurrent ? 3 : 1,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+      ]).start();
+    }
+  };
+
+  const animatedStyle = {
+    transform: [{ scale: scaleAnimation }],
+    shadowOpacity: shadowAnimation,
+    elevation: shadowAnimation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 8],
+    }),
+    zIndex: shadowAnimation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [1, 10],
+    }),
+  };
+
+  const borderStyle = {
+    borderWidth: borderAnimation,
+    borderColor: isCurrent ? config.color : Colors.white + '40',
+    shadowColor: config.color,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 12,
+  };
+
+  const glowStyle = isCurrent ? {
+    shadowOpacity: glowAnimation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.2, 0.6],
+    }),
+  } : {};
+
+  return (
+    <Animated.View
+      style={[
+        styles.planComparisonCard,
+        animatedStyle,
+        {
+          borderWidth: isCurrent ? 2 : 1,
+          borderColor: isCurrent ? config.color : Colors.white + '30',
+          backgroundColor: isCurrent ? config.color + '15' : Colors.black + '40',
+        },
+      ]}
+      onTouchStart={handlePressIn}
+      onTouchEnd={handlePressOut}
+      {...(Platform.OS === 'web' && {
+        onMouseEnter: handleHoverIn,
+        onMouseLeave: handleHoverOut,
+      })}
+    >
+      <View style={styles.planCardContent}>
+        {isCurrent && (
+          <View style={[styles.currentBadge, { backgroundColor: config.color }]}>
+            <Text style={styles.currentBadgeText}>Current</Text>
+          </View>
+        )}
+        
+        <Text style={[styles.planCardName, { color: config.color }]}>
+          {config.name}
+        </Text>
+        
+        {/* Limited Time Offer Badge */}
+        {config.isLimitedTimeOffer && (
+          <View style={styles.limitedOfferBadge}>
+            <Text style={styles.limitedOfferText}>🔥 LIMITED TIME</Text>
+            <Text style={[styles.savingsText, { color: config.color }]}>{config.savingsPercentage}</Text>
+          </View>
+        )}
+        
+        {/* Price with strikethrough for original price */}
+        <View style={styles.priceContainer}>
+          <Text style={styles.planCardPrice}>{config.priceText}</Text>
+          {config.originalPriceText && (
+            <Text style={styles.originalPrice}>{config.originalPriceText}</Text>
+          )}
+        </View>
+        
+        {/* Savings info */}
+        {config.savings && (
+          <Text style={[styles.savingsInfo, { color: config.color }]}>
+            {config.savings} • {config.monthlyOriginalPriceText} regular price
+          </Text>
+        )}
+        
+        <View style={styles.planCardFeatures}>
+          {config.features.slice(0, 3).map((feature, index) => (
+            <View key={index} style={styles.planCardFeature}>
+              <View style={[styles.checkmarkIcon, { backgroundColor: config.color + '20' }]}>
+                <Ionicons name="checkmark" size={14} color={config.color} />
+              </View>
+              <Text style={styles.planCardFeatureText}>{feature}</Text>
+            </View>
+          ))}
+          {config.features.length > 3 && (
+            <Text style={[styles.planCardMoreFeatures, { color: config.color + '80' }]}>
+              +{config.features.length - 3} more features
+            </Text>
+          )}
+        </View>
+
+        {!isCurrent && (
+          <TouchableOpacity
+            style={[styles.selectPlanButton, { 
+              borderColor: config.color,
+              backgroundColor: config.color + '10'
+            }]}
+            onPress={() => onUpgrade(tier)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.selectPlanText, { color: config.color }]}>
+              {tier === SUBSCRIPTION_TIERS.FREE ? 'Downgrade' : 'Select Plan'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {isCurrent && (
+          <View style={[styles.currentPlanIndicator, { backgroundColor: config.color + '20' }]}>
+            <Text style={[styles.currentPlanText, { color: config.color }]}>
+              Active Plan
+            </Text>
+          </View>
+        )}
+      </View>
+    </Animated.View>
+  );
+};
+
 export default function SubscriptionScreen({ navigation }) {
   const [subscriptionStatus, setSubscriptionStatus] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -129,18 +367,28 @@ export default function SubscriptionScreen({ navigation }) {
         <BlurView intensity={Platform.OS === 'ios' ? 100 : 80} style={styles.sectionBlur}>
           <LinearGradient
             colors={[
-              Colors.black + '40',
-              config.color + '20',
-              Colors.black + '40',
+              Colors.black + '60',
+              config.color + '10',
+              Colors.black + '60',
             ]}
             style={styles.sectionGradient}
           >
             <View style={styles.currentPlanHeader}>
               <View style={styles.planInfo}>
-                <Text style={[styles.currentPlanName, { color: config.color }]}>
+                <Text style={styles.currentPlanName}>
                   {config.name} Plan
                 </Text>
-                <Text style={styles.currentPlanPrice}>{config.priceText}</Text>
+                <View style={styles.currentPlanPriceContainer}>
+                  <Text style={styles.currentPlanPrice}>{config.priceText}</Text>
+                  {config.isLimitedTimeOffer && config.originalPriceText && (
+                    <Text style={styles.currentPlanOriginalPrice}>{config.originalPriceText}</Text>
+                  )}
+                </View>
+                {config.isLimitedTimeOffer && (
+                  <Text style={[styles.currentPlanSavings, { color: config.color }]}>
+                    🔥 Limited Time: {config.savingsPercentage} • {config.savings}
+                  </Text>
+                )}
               </View>
               <View style={[styles.planBadge, { backgroundColor: config.color }]}>
                 <Ionicons name="star" size={16} color={Colors.white} />
@@ -237,9 +485,9 @@ export default function SubscriptionScreen({ navigation }) {
         <BlurView intensity={Platform.OS === 'ios' ? 100 : 80} style={styles.sectionBlur}>
           <LinearGradient
             colors={[
-              Colors.black + '40',
-              Colors.purple + '20',
-              Colors.black + '40',
+              Colors.black + '60',
+              Colors.purple + '10',
+              Colors.black + '60',
             ]}
             style={styles.sectionGradient}
           >
@@ -254,57 +502,13 @@ export default function SubscriptionScreen({ navigation }) {
                 const isCurrent = subscriptionStatus?.tier === tier;
                 
                 return (
-                  <View
+                  <PlanCard
                     key={tier}
-                    style={[
-                      styles.planComparisonCard,
-                      isCurrent && { borderColor: config.color, borderWidth: 2 }
-                    ]}
-                  >
-                    <BlurView intensity={50} style={styles.planCardBlur}>
-                      <LinearGradient
-                        colors={isCurrent ? [...config.gradient, config.color + '20'] : [Colors.black + '60', 'transparent']}
-                        style={styles.planCardGradient}
-                      >
-                        {isCurrent && (
-                          <View style={[styles.currentBadge, { backgroundColor: config.color }]}>
-                            <Text style={styles.currentBadgeText}>Current</Text>
-                          </View>
-                        )}
-                        
-                        <Text style={[styles.planCardName, { color: config.color }]}>
-                          {config.name}
-                        </Text>
-                        <Text style={styles.planCardPrice}>{config.priceText}</Text>
-                        
-                        <View style={styles.planCardFeatures}>
-                          {config.features.slice(0, 3).map((feature, index) => (
-                            <View key={index} style={styles.planCardFeature}>
-                              <Ionicons name="checkmark" size={12} color={config.color} />
-                              <Text style={styles.planCardFeatureText}>{feature}</Text>
-                            </View>
-                          ))}
-                          {config.features.length > 3 && (
-                            <Text style={styles.planCardMoreFeatures}>
-                              +{config.features.length - 3} more features
-                            </Text>
-                          )}
-                        </View>
-
-                        {!isCurrent && (
-                          <TouchableOpacity
-                            style={[styles.selectPlanButton, { borderColor: config.color }]}
-                            onPress={() => handleUpgrade(tier)}
-                            activeOpacity={0.7}
-                          >
-                            <Text style={[styles.selectPlanText, { color: config.color }]}>
-                              {tier === SUBSCRIPTION_TIERS.FREE ? 'Downgrade' : 'Select Plan'}
-                            </Text>
-                          </TouchableOpacity>
-                        )}
-                      </LinearGradient>
-                    </BlurView>
-                  </View>
+                    tier={tier}
+                    config={config}
+                    isCurrent={isCurrent}
+                    onUpgrade={handleUpgrade}
+                  />
                 );
               })}
             </ScrollView>
@@ -446,10 +650,14 @@ const styles = StyleSheet.create({
   sectionBlur: {
     borderRadius: 20,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: Colors.white + '20',
+    backgroundColor: Colors.black + '30',
     ...GlassStyles.container,
   },
   sectionGradient: {
     padding: 20,
+    borderRadius: 20,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -475,10 +683,25 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 4,
+    color: Colors.lightGreen,
   },
   currentPlanPrice: {
     fontSize: 16,
-    color: Colors.gray,
+    color: Colors.white,
+  },
+  currentPlanPriceContainer: {
+    marginBottom: 4,
+  },
+  currentPlanOriginalPrice: {
+    fontSize: 14,
+    color: Colors.white + '60',
+    textDecorationLine: 'line-through',
+    marginTop: 2,
+  },
+  currentPlanSavings: {
+    fontSize: 12,
+    fontWeight: '600',
+    opacity: 0.9,
   },
   planBadge: {
     width: 40,
@@ -511,7 +734,7 @@ const styles = StyleSheet.create({
   },
   usageBarTrack: {
     height: 8,
-    backgroundColor: Colors.gray + '30',
+    backgroundColor: Colors.white + '30',
     borderRadius: 4,
     overflow: 'hidden',
   },
@@ -521,7 +744,7 @@ const styles = StyleSheet.create({
   },
   usagePercentage: {
     fontSize: 12,
-    color: Colors.gray,
+    color: Colors.white,
     textAlign: 'right',
   },
   featuresContainer: {
@@ -543,7 +766,7 @@ const styles = StyleSheet.create({
   },
   featureText: {
     fontSize: 14,
-    color: Colors.gray,
+    color: Colors.white,
     flex: 1,
   },
   actionButtons: {
@@ -578,77 +801,152 @@ const styles = StyleSheet.create({
   },
   plansScroll: {
     flexDirection: 'row',
+    paddingVertical: 10,
+    paddingHorizontal: 5,
   },
   planComparisonCard: {
-    width: width * 0.7,
+    width: width * 0.55,
     marginRight: 15,
-    borderRadius: 15,
+    marginVertical: 5,
+    borderRadius: 8,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.gray + '30',
+    minHeight: 220,
+    shadowColor: Colors.purple,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    zIndex: 1,
   },
-  planCardBlur: {
+  planCardContent: {
+    padding: 16,
     flex: 1,
-  },
-  planCardGradient: {
-    padding: 15,
-    minHeight: 200,
+    position: 'relative',
   },
   currentBadge: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
+    top: 8,
+    right: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
     zIndex: 1,
   },
   currentBadgeText: {
     fontSize: 10,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: Colors.white,
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   planCardName: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 6,
+    marginTop: 8,
   },
   planCardPrice: {
-    fontSize: 16,
-    color: Colors.gray,
-    marginBottom: 15,
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.white,
+    opacity: 0.9,
+  },
+  limitedOfferBadge: {
+    backgroundColor: Colors.orange + '20',
+    borderColor: Colors.orange,
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+  },
+  limitedOfferText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: Colors.orange,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  savingsText: {
+    fontSize: 10,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  priceContainer: {
+    marginBottom: 8,
+  },
+  originalPrice: {
+    fontSize: 14,
+    color: Colors.white + '60',
+    textDecorationLine: 'line-through',
+    marginTop: 2,
+  },
+  savingsInfo: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 12,
+    opacity: 0.9,
   },
   planCardFeatures: {
     flex: 1,
-    gap: 6,
+    gap: 10,
   },
   planCardFeature: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    marginBottom: 2,
+  },
+  checkmarkIcon: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
   },
   planCardFeatureText: {
-    fontSize: 12,
-    color: Colors.gray,
+    color: Colors.white,
+    fontSize: 13,
     flex: 1,
+    opacity: 0.9,
+    lineHeight: 18,
   },
   planCardMoreFeatures: {
     fontSize: 11,
-    color: Colors.lightGreen,
     fontStyle: 'italic',
-    marginTop: 4,
+    marginTop: 8,
+    textAlign: 'center',
+    opacity: 0.7,
   },
   selectPlanButton: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    borderWidth: 1.5,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginTop: 14,
     alignItems: 'center',
-    marginTop: 10,
+    justifyContent: 'center',
   },
   selectPlanText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  currentPlanIndicator: {
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginTop: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  currentPlanText: {
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });
