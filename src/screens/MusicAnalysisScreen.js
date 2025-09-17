@@ -272,7 +272,7 @@ export default function MusicAnalysisScreen({ route, navigation }) {
       }
     } catch (error) {
       console.error("Failed to load music data:", error);
-      Alert.alert("Error", "Failed to load music analysis data");
+      Alert.alert("Error", "Failed to load music chords data");
     } finally {
       setLoading(false);
     }
@@ -536,7 +536,7 @@ export default function MusicAnalysisScreen({ route, navigation }) {
         // Show brief success feedback
         Alert.alert(
           "Thank you!",
-          `Your ${rating}-star rating helps us improve the music analysis quality.`,
+          `Your ${rating}-star rating helps us improve the music chords quality.`,
           [{ text: "OK", style: "default" }]
         );
       } else {
@@ -763,7 +763,7 @@ export default function MusicAnalysisScreen({ route, navigation }) {
             <Ionicons name="arrow-back" size={24} color={Colors.lightGreen} />
           </TouchableOpacity>
           <Text style={styles.headerTitle} numberOfLines={1}>
-            Music Analysis
+            Music Chords
           </Text>
           {proficiencyConfig && (
             <View

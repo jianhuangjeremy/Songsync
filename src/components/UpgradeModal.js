@@ -363,11 +363,10 @@ export default function UpgradeModal({
                         colors={[Colors.lightGreen + '20', Colors.purple + '20']}
                         style={styles.shareButtonGradient}
                       >
-                        <Ionicons name="share-social" size={20} color={Colors.lightGreen} />
                         <Text style={styles.shareButtonText}>
                           Get Free Credits by Sharing
                         </Text>
-                        <Ionicons name="gift" size={16} color={Colors.yellow} />
+                        <Ionicons name="share-social" size={20} color={Colors.white} />
                       </LinearGradient>
                     </TouchableOpacity>
                   )}
@@ -601,9 +600,7 @@ const styles = StyleSheet.create({
   shareButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.lightGreen,
-    flex: 1,
-    textAlign: 'center',
+    color: Colors.white,
   },
   laterButton: {
     paddingVertical: 12,

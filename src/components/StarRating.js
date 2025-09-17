@@ -112,7 +112,7 @@ export default function StarRating({
 
       {hasRated && (
         <Text style={styles.subtitleText}>
-          Your feedback helps us improve the music analysis quality
+          Your feedback helps us improve the music chords quality
         </Text>
       )}
     </BlurView>

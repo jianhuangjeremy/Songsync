@@ -18,7 +18,7 @@ export const SUBSCRIPTION_CONFIG = {
     canDownloadMidi: false,
     features: [
       "3 song identifications per day",
-      "Basic music analysis",
+      "Basic music chords",
       "Song library access",
       "Star rating system",
     ],
@@ -34,7 +34,7 @@ export const SUBSCRIPTION_CONFIG = {
     canDownloadMidi: false,
     features: [
       "10 song identifications per day",
-      "Advanced music analysis",
+      "Advanced music chords",
       "Unlimited song library",
       "No ads interruption",
     ],

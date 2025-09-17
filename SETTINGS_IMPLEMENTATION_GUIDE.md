@@ -1,7 +1,7 @@
 # Settings & Proficiency System Implementation
 
 ## Overview
-Successfully implemented a comprehensive settings system with music proficiency levels for the Songbook app. The system adapts the music analysis presentation based on user skill level.
+Successfully implemented a comprehensive settings system with music proficiency levels for the Songbook app. The system adapts the music chords presentation based on user skill level.
 
 ## New Features Added
 
@@ -28,7 +28,7 @@ Successfully implemented a comprehensive settings system with music proficiency 
 - **Additional Settings**: Reset preferences, sign out functionality
 - **Responsive Design**: Adapts to different screen sizes
 
-### 4. Adaptive Music Analysis (`/src/screens/MusicAnalysisScreen.js`)
+### 4. Adaptive Music Chords (`/src/screens/MusicAnalysisScreen.js`)
 - **Dynamic Content**: Analysis adapts based on user proficiency
 - **Enhanced Chord Display**: Shows different complexity levels
 - **Music Theory Integration**: Roman numeral analysis for advanced users

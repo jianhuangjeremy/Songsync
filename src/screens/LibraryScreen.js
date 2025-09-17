@@ -9,6 +9,7 @@ import {
   Alert,
   RefreshControl,
   Image,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -104,6 +105,32 @@ export default function LibraryScreen({ navigation }) {
     return `Played ${count} times`;
   };
 
+  const handleDiscordPress = async () => {
+    const discordUrl = 'https://discord.com/channels/1415944429054722051/1415944791786782732';
+    
+    try {
+      const supported = await Linking.canOpenURL(discordUrl);
+      if (supported) {
+        await Linking.openURL(discordUrl);
+      } else {
+        Alert.alert(
+          'Discord Community',
+          'Join our Discord community to connect with other music enthusiasts!\n\n' + discordUrl,
+          [
+            { text: 'Copy Link', onPress: () => {
+              // In a real app, you'd use a clipboard library
+              Alert.alert('Discord Link', discordUrl);
+            }},
+            { text: 'OK', style: 'default' }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error opening Discord link:', error);
+      Alert.alert('Error', 'Could not open Discord. Please try again later.');
+    }
+  };
+
   const renderSongItem = ({ item: song }) => (
     <BlurView intensity={15} style={[styles.songCard, GlassStyles.glassCard]}>
       <TouchableOpacity
@@ -156,7 +183,7 @@ export default function LibraryScreen({ navigation }) {
             activeOpacity={0.8}
           >
             <Ionicons name="analytics-outline" size={16} color={Colors.lightGreen} />
-            <Text style={styles.analysisButtonText}>Music Analysis</Text>
+            <Text style={styles.analysisButtonText}>Music Chords</Text>
             <Ionicons name="chevron-forward" size={14} color={Colors.lightGreen} />
           </TouchableOpacity>
         </View>
@@ -187,6 +214,40 @@ export default function LibraryScreen({ navigation }) {
         >
           <Ionicons name="mic" size={20} color={Colors.lightGreen} />
           <Text style={styles.startButtonText}>Start Identifying</Text>
+        </TouchableOpacity>
+      </BlurView>
+    </View>
+  );
+
+  const renderDiscordFooter = () => (
+    <View style={styles.discordFooterContainer}>
+      <BlurView intensity={15} style={[styles.discordCard, GlassStyles.glassCard]}>
+        <View style={styles.discordHeader}>
+          <View style={styles.discordIconContainer}>
+            <View style={styles.discordLogo}>
+              <Text style={styles.discordLogoText}>Discord</Text>
+            </View>
+          </View>
+          <View style={styles.discordContent}>
+            <Text style={styles.discordTitle}>Join Our Community</Text>
+            <Text style={styles.discordSubtitle}>
+              Connect with music enthusiasts, share discoveries, and get help with chord analysis
+            </Text>
+          </View>
+        </View>
+        
+        <TouchableOpacity
+          style={styles.discordButton}
+          onPress={handleDiscordPress}
+          activeOpacity={0.8}
+        >
+          <View style={styles.discordButtonContent}>
+            <View style={styles.discordButtonIcon}>
+              <Text style={styles.discordButtonIconText}>💬</Text>
+            </View>
+            <Text style={styles.discordButtonText}>Join Discord Community</Text>
+            <Ionicons name="external-link" size={16} color={Colors.white} />
+          </View>
         </TouchableOpacity>
       </BlurView>
     </View>
@@ -251,6 +312,7 @@ export default function LibraryScreen({ navigation }) {
           style={styles.list}
           contentContainerStyle={library.length === 0 ? styles.emptyListContainer : styles.listContainer}
           ListEmptyComponent={renderEmptyLibrary}
+          ListFooterComponent={library.length > 0 ? renderDiscordFooter : null}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -514,5 +576,97 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontWeight: '500',
     flex: 1,
+  },
+  // Discord Community Styles
+  discordFooterContainer: {
+    paddingTop: 20,
+    paddingBottom: 20,
+  },
+  discordCard: {
+    padding: 20,
+    borderRadius: 16,
+    marginHorizontal: 0,
+    backgroundColor: 'rgba(88, 101, 242, 0.1)', // Discord brand color with transparency
+    borderWidth: 1,
+    borderColor: 'rgba(88, 101, 242, 0.3)',
+  },
+  discordHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  discordIconContainer: {
+    marginRight: 12,
+  },
+  discordLogo: {
+    width: 40,
+    height: 40,
+    backgroundColor: '#5865F2', // Discord brand color
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#5865F2',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  discordLogoText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: Colors.white,
+    textAlign: 'center',
+  },
+  discordContent: {
+    flex: 1,
+  },
+  discordTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.white,
+    marginBottom: 6,
+  },
+  discordSubtitle: {
+    fontSize: 14,
+    color: Colors.lightGray,
+    lineHeight: 20,
+    opacity: 0.9,
+  },
+  discordButton: {
+    backgroundColor: '#5865F2',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#5865F2',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  discordButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+  },
+  discordButtonIcon: {
+    marginRight: 10,
+  },
+  discordButtonIconText: {
+    fontSize: 18,
+  },
+  discordButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.white,
+    flex: 1,
+    textAlign: 'center',
+    marginRight: 10,
   },
 });

@@ -6,6 +6,8 @@ import {
   StyleSheet,
   Modal,
   Dimensions,
+  Linking,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -24,6 +26,30 @@ export default function NoSongFoundModal({
   maxRetries = 2,
   canRetry = true
 }) {
+  const handleDiscordHelp = async () => {
+    const discordUrl = 'https://discord.com/channels/1415944429054722051/1415944791786782732';
+    
+    try {
+      const supported = await Linking.canOpenURL(discordUrl);
+      if (supported) {
+        await Linking.openURL(discordUrl);
+      } else {
+        Alert.alert(
+          'Discord Community',
+          'Join our Discord community for help with song identification!\n\n' + discordUrl,
+          [
+            { text: 'Copy Link', onPress: () => {
+              Alert.alert('Discord Link', discordUrl);
+            }},
+            { text: 'OK', style: 'default' }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error opening Discord link:', error);
+      Alert.alert('Error', 'Could not open Discord. Please try again later.');
+    }
+  };
   return (
     <Modal
       visible={visible}
@@ -118,6 +144,22 @@ export default function NoSongFoundModal({
                 </BlurView>
               </TouchableOpacity>
             </View>
+
+            {/* Discord Help Button */}
+            <TouchableOpacity
+              style={styles.discordHelpButton}
+              onPress={handleDiscordHelp}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={['#5865F2', '#4752C4']}
+                style={styles.discordHelpGradient}
+              >
+                <Text style={styles.discordHelpText}>💬</Text>
+                <Text style={styles.discordHelpText}>Get Help on Discord</Text>
+                <Ionicons name="external-link" size={16} color={Colors.white} />
+              </LinearGradient>
+            </TouchableOpacity>
 
             {/* Tips */}
             <View style={styles.tipsContainer}>
@@ -280,5 +322,33 @@ const styles = StyleSheet.create({
     color: Colors.lightGray,
     marginBottom: 4,
     opacity: 0.8,
+  },
+  // Discord Help Button Styles
+  discordHelpButton: {
+    height: 50,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 16,
+    shadowColor: '#5865F2',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  discordHelpGradient: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+  },
+  discordHelpText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.white,
   },
 });

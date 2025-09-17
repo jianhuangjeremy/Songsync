@@ -208,7 +208,7 @@ export default function SongResultModal({
                         <View style={styles.analysisButtonContent}>
                           <Ionicons name="analytics-outline" size={20} color={Colors.lightGreen} />
                           <View style={styles.analysisTextContainer}>
-                            <Text style={styles.analysisButtonTitle}>Music Analysis</Text>
+                            <Text style={styles.analysisButtonTitle}>Music Chords</Text>
                             <Text style={styles.analysisButtonSubtitle}>View chords & MIDI</Text>
                           </View>
                           <Ionicons name="chevron-forward" size={18} color={Colors.lightGreen} />

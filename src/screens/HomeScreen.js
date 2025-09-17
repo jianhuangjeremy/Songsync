@@ -118,6 +118,35 @@ export default function HomeScreen({ navigation }) {
   const [lastIsBase64, setLastIsBase64] = useState(false);
   const [identificationSessionId, setIdentificationSessionId] = useState(null);
 
+  // Demo songs for first-time users
+  const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
+  const [demoSongs] = useState([
+    {
+      id: "demo_bohemian_rhapsody",
+      name: "Bohemian Rhapsody",
+      singerName: "Queen",
+      album: "A Night at the Opera",
+      duration: "5:55",
+      genre: "Rock",
+      year: "1975",
+      confidence: 0.95,
+      albumCover: "https://upload.wikimedia.org/wikipedia/en/4/4d/Queen_A_Night_at_the_Opera.png",
+      isDemo: true
+    },
+    {
+      id: "demo_love_story",
+      name: "Love Story",
+      singerName: "Taylor Swift", 
+      album: "Fearless",
+      duration: "3:55",
+      genre: "Country Pop",
+      year: "2008",
+      confidence: 0.92,
+      albumCover: "https://upload.wikimedia.org/wikipedia/en/8/86/Taylor_Swift_-_Fearless.png",
+      isDemo: true
+    }
+  ]);
+
   const scaleAnimation = useRef(new Animated.Value(1)).current;
   const pulseAnimation = useRef(new Animated.Value(1)).current;
   const rotateAnimation = useRef(new Animated.Value(0)).current;
@@ -157,6 +186,7 @@ export default function HomeScreen({ navigation }) {
       try {
         await loadRecentResults();
         await loadSubscriptionStatus();
+        await checkFirstTimeUser();
       } catch (error) {
         console.error("Error initializing component:", error);
       }
@@ -230,6 +260,35 @@ export default function HomeScreen({ navigation }) {
       setRecentResults(recent);
     } catch (error) {
       console.error("Error loading recent results:", error);
+    }
+  };
+
+  const checkFirstTimeUser = async () => {
+    try {
+      const library = await getLibrary(user.id);
+      // Check if user has never identified any songs (excluding demo library)
+      const userIdentifiedSongs = library.filter(song => !song.isDemo);
+      setIsFirstTimeUser(userIdentifiedSongs.length === 0);
+    } catch (error) {
+      console.error("Error checking first-time user status:", error);
+      setIsFirstTimeUser(true); // Default to showing demo for safety
+    }
+  };
+
+  const handleDemoSongPress = async (demoSong) => {
+    try {
+      // Save demo song to library if not already there
+      await saveSongToLibrary(demoSong, user.id);
+      
+      // Navigate to music chords screen
+      navigation.navigate("MusicAnalysis", { song: demoSong });
+      
+      // Refresh recent results to show the demo song
+      await loadRecentResults();
+    } catch (error) {
+      console.error("Error handling demo song:", error);
+      // Still navigate even if save fails
+      navigation.navigate("MusicAnalysis", { song: demoSong });
     }
   };
 
@@ -496,7 +555,7 @@ export default function HomeScreen({ navigation }) {
           results[0]
         );
 
-        // Automatically navigate to music analysis with the first (best) result
+        // Automatically navigate to music chords with the first (best) result
         const bestResult = results[0]; // Take the first result (usually highest confidence)
 
         // Save to library first
@@ -508,7 +567,7 @@ export default function HomeScreen({ navigation }) {
           console.log("Song may already exist in library:", saveError.message);
         }
 
-        // Navigate directly to music analysis screen
+        // Navigate directly to music chords screen
         navigation.navigate("MusicAnalysis", { song: bestResult });
 
         // Refresh subscription status to update UI
@@ -844,7 +903,7 @@ export default function HomeScreen({ navigation }) {
                 ? `Listening... ${recordingCountdown}s`
                 : isProcessing
                 ? "Identifying song..."
-                : "Convert Music to audio"}
+                : "Convert Music to Audio"}
             </Text>
             <Text style={styles.statusSubtext}>
               {isRecording
@@ -1000,6 +1059,66 @@ export default function HomeScreen({ navigation }) {
               </View>
             </BlurView>
           </View>
+
+          {/* Demo Songs for First-Time Users */}
+          {isFirstTimeUser && (
+            <View style={styles.demoSongsContainer}>
+              <BlurView
+                intensity={15}
+                style={[styles.demoSongsCard, GlassStyles.glassCard]}
+              >
+                <View style={styles.demoSongsHeader}>
+                  <Ionicons name="musical-notes" size={24} color={Colors.lightGreen} />
+                  <Text style={styles.demoSongsTitle}>
+                    Try These Demo Songs
+                  </Text>
+                  <Ionicons name="sparkles" size={20} color={Colors.purple} />
+                </View>
+                <Text style={styles.demoSongsSubtitle}>
+                  Explore music chords with these popular songs
+                </Text>
+
+                <View style={styles.demoSongsList}>
+                  {demoSongs.map((song) => (
+                    <TouchableOpacity
+                      key={song.id}
+                      style={styles.demoSongItem}
+                      onPress={() => handleDemoSongPress(song)}
+                      activeOpacity={0.8}
+                    >
+                      <View style={styles.demoSongAlbum}>
+                        <Image
+                          source={{ uri: song.albumCover }}
+                          style={styles.demoAlbumCover}
+                          resizeMode="cover"
+                        />
+                        <View style={styles.demoPlayOverlay}>
+                          <Ionicons name="play" size={16} color={Colors.white} />
+                        </View>
+                      </View>
+                      <View style={styles.demoSongInfo}>
+                        <Text style={styles.demoSongName}>{song.name}</Text>
+                        <Text style={styles.demoSongArtist}>by {song.singerName}</Text>
+                        <View style={styles.demoSongMeta}>
+                          <View style={styles.demoGenreBadge}>
+                            <Text style={styles.demoGenreText}>{song.genre}</Text>
+                          </View>
+                          <Text style={styles.demoYearText}>{song.year}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.demoSongAction}>
+                        <View style={styles.demoActionButton}>
+                          <Ionicons name="musical-note" size={16} color={Colors.lightGreen} />
+                          <Text style={styles.demoActionText}>View Chords</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={Colors.lightGreen} />
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </BlurView>
+            </View>
+          )}
 
           {/* Recent Results */}
           {recentResults.length > 0 && (
@@ -1300,6 +1419,129 @@ const styles = StyleSheet.create({
     color: Colors.lightGray,
     marginLeft: 12,
     flex: 1,
+  },
+  // Demo Songs Styles
+  demoSongsContainer: {
+    width: "100%",
+    marginBottom: 20,
+    paddingHorizontal: 0,
+  },
+  demoSongsCard: {
+    padding: 20,
+    margin: 0,
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  demoSongsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  demoSongsTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: Colors.white,
+    marginHorizontal: 12,
+    textAlign: "center",
+  },
+  demoSongsSubtitle: {
+    fontSize: 14,
+    color: Colors.lightGray,
+    textAlign: "center",
+    marginBottom: 20,
+    opacity: 0.8,
+  },
+  demoSongsList: {
+    gap: 12,
+  },
+  demoSongItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+  },
+  demoSongAlbum: {
+    position: "relative",
+    marginRight: 12,
+  },
+  demoAlbumCover: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    backgroundColor: Colors.darkPurple,
+  },
+  demoPlayOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    borderRadius: 8,
+  },
+  demoSongInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  demoSongName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: Colors.white,
+    marginBottom: 2,
+  },
+  demoSongArtist: {
+    fontSize: 13,
+    color: Colors.lightGreen,
+    marginBottom: 4,
+  },
+  demoSongMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  demoGenreBadge: {
+    backgroundColor: "rgba(139, 92, 246, 0.2)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "rgba(139, 92, 246, 0.3)",
+  },
+  demoGenreText: {
+    fontSize: 11,
+    color: Colors.purple,
+    fontWeight: "500",
+  },
+  demoYearText: {
+    fontSize: 11,
+    color: Colors.lightGray,
+    opacity: 0.7,
+  },
+  demoSongAction: {
+    alignItems: "center",
+    gap: 4,
+  },
+  demoActionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(16, 185, 129, 0.1)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(16, 185, 129, 0.3)",
+  },
+  demoActionText: {
+    fontSize: 11,
+    color: Colors.lightGreen,
+    fontWeight: "500",
+    marginLeft: 4,
   },
   recentResultsContainer: {
     width: "100%",
